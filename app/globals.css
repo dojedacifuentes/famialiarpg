@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+
+html, body { background: #05060a; color: #e8e2cf; }
+
+body {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  background-image:
+    radial-gradient(1200px 600px at 20% -10%, rgba(0,229,255,.07), transparent 60%),
+    radial-gradient(900px 500px at 90% 110%, rgba(167,139,250,.07), transparent 60%),
+    linear-gradient(180deg, #05060a, #05060a);
+  min-height: 100vh;
+}
+
+/* CRT scanlines */
+.crt::before {
+  content: "";
+  position: fixed; inset: 0; pointer-events: none; z-index: 50;
+  background: repeating-linear-gradient(180deg, rgba(255,255,255,.03) 0 1px, transparent 1px 3px);
+  mix-blend-mode: overlay;
+}
+.crt::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 51;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55));
+}
+
+.terminal {
+  border: 1px solid rgba(0,229,255,.25);
+  background: linear-gradient(180deg, rgba(10,13,20,.85), rgba(5,6,10,.95));
+  box-shadow: 0 0 24px rgba(0,229,255,.12), inset 0 0 24px rgba(0,229,255,.05);
+}
+
+.btn {
+  @apply px-4 py-2 border border-neon-blue/40 text-neon-blue uppercase tracking-widest text-xs;
+  background: rgba(0,229,255,.04);
+  transition: all .15s ease;
+}
+.btn:hover { background: rgba(0,229,255,.12); box-shadow: 0 0 18px rgba(0,229,255,.35); }
+.btn-danger { @apply text-neon-red border-neon-red/50; background: rgba(255,46,99,.05); }
+.btn-danger:hover { background: rgba(255,46,99,.15); box-shadow: 0 0 18px rgba(255,46,99,.4); }
+
+.label-art { font-family: "Cinzel", serif; letter-spacing: .18em; }
+
+.divider {
+  height: 1px; background: linear-gradient(90deg, transparent, rgba(0,229,255,.5), transparent);
+}
+
+.glitch-text {
+  position: relative;
+  text-shadow: 0 0 6px rgba(0,229,255,.7), 0 0 18px rgba(0,229,255,.25);
+}
+
+.doc {
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.02) 0 24px, transparent 24px 25px),
+    #f4ecd7;
+  color: #1a1a1a;
+  border: 1px solid #cdbf94;
+  box-shadow: 0 8px 30px rgba(0,0,0,.55);
+}
+
+.tag {
+  @apply inline-block text-[10px] px-2 py-0.5 uppercase tracking-widest border border-neon-blue/40 text-neon-blue;
+}
+.tag-red { @apply text-neon-red border-neon-red/50; }
+.tag-amber { @apply text-neon-amber border-neon-amber/50; }
+.tag-violet { @apply text-neon-violet border-neon-violet/50; }
+
+.barfill { background: linear-gradient(90deg, #00e5ff, #a78bfa); }
