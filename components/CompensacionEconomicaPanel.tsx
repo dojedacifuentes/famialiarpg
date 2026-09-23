@@ -1,8 +1,20 @@
 "use client";
+// ============================================================================
+// COMPENSACIÓN ECONÓMICA (arts. 61-66 LMC) — formulario convertido en pasos:
+// factores personales → factores de mercado → cálculo → modalidad → acuerdo.
+// La calculadora y el aviso de culpa (art. 62 inc. 2°) son los originales.
+// ============================================================================
 import { useState } from "react";
+import Link from "next/link";
 import { useGame } from "@/store/useGame";
 import { calcularCompensacionEconomica } from "@/lib/reglas";
 import type { FactoresCE, ModalidadPagoCE } from "@/types/game";
+import { capitulo, progresoCapitulo } from "@/data/capitulos";
+import { pesos } from "@/data/escenario";
+import Actividad from "@/components/ui/Actividad";
+import Consecuencia from "@/components/ui/Consecuencia";
+import { Paginado } from "@/components/ui/Ajuste";
+import Icono from "@/components/ui/Icono";
 
 const MODALIDADES: { id: ModalidadPagoCE; nombre: string; desc: string }[] = [
   { id: "monto_unico", nombre: "Monto único", desc: "Suma fija pagadera de una vez. Requiere capacidad económica del deudor." },
@@ -11,8 +23,50 @@ const MODALIDADES: { id: ModalidadPagoCE; nombre: string; desc: string }[] = [
   { id: "usufructo_uso_habitacion", nombre: "Usufructo, uso o habitación", desc: "Derecho real temporal sobre un bien del deudor. Útil cuando hay vivienda compartida." },
 ];
 
+const REGLA = {
+  titulo: "Compensación económica (arts. 61-66 LMC)",
+  parrafos: [
+    "Procede cuando uno de los cónyuges, por dedicarse al cuidado del hogar o de los hijos o realizar trabajo en menor medida, no pudo desarrollar actividad remunerada durante el matrimonio (art. 61).",
+    "Los criterios del art. 62 ponderan el \"menoscabo económico\".",
+  ],
+  articulo: "Arts. 61, 62, 65 LMC",
+};
+
+const PASOS = ["Factores personales", "Factores de mercado", "Cálculo", "Modalidad"] as const;
+
+function Contador({ etiqueta, valor, min, max, onCambio, sufijo }: { etiqueta: string; valor: number; min: number; max: number; onCambio: (v: number) => void; sufijo: string }) {
+  const fijar = (v: number) => onCambio(Math.max(min, Math.min(max, Number.isFinite(v) ? v : min)));
+  const id = `c-${etiqueta.replace(/\W+/g, "-")}`;
+  return (
+    <div>
+      <label htmlFor={id} className="rotulo">{etiqueta}</label>
+      <div className="flex items-center gap-2 mt-1">
+        <button type="button" className="btn btn-secundario btn-icono" onClick={() => fijar(valor - 1)} aria-label={`Restar a ${etiqueta.toLowerCase()}`}><Icono nombre="menos" tam={18} /></button>
+        <input id={id} className="campo text-center cifra max-w-[6rem]" type="number" inputMode="numeric" min={min} max={max} value={valor} onChange={(e) => fijar(Number(e.target.value))} />
+        <span className="t-meta txt-2">{sufijo}</span>
+        <button type="button" className="btn btn-secundario btn-icono" onClick={() => fijar(valor + 1)} aria-label={`Sumar a ${etiqueta.toLowerCase()}`}><Icono nombre="mas" tam={18} /></button>
+      </div>
+    </div>
+  );
+}
+
+function Segmentado<T extends string>({ etiqueta, valor, opciones, onCambio }: { etiqueta: string; valor: T; opciones: { id: T; nombre: string }[]; onCambio: (v: T) => void }) {
+  return (
+    <fieldset>
+      <legend className="rotulo mb-1">{etiqueta}</legend>
+      <div className="grid grid-cols-3 gap-1.5">
+        {opciones.map((o) => (
+          <button key={o.id} type="button" className="fila-check justify-center" aria-pressed={valor === o.id} onClick={() => onCambio(o.id)}>{o.nombre}</button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 export default function CompensacionEconomicaPanel() {
-  const { conyuge, personaje, flags, setCE, pushLog } = useGame();
+  const game = useGame();
+  const { personaje, flags, ce } = game;
+  const [paso, setPaso] = useState(0);
   const [f, setF] = useState<FactoresCE>({
     duracionMatrimonioAños: 10,
     edadConyugeBeneficiario: 45,
@@ -24,22 +78,16 @@ export default function CompensacionEconomicaPanel() {
     colaboracionActividadConyuge: false,
   });
   const [modalidad, setModalidad] = useState<ModalidadPagoCE>("cuotas_reajustables");
-  const [calculo, setCalculo] = useState<ReturnType<typeof calcularCompensacionEconomica> | null>(null);
+  const cap = capitulo("compensacion_economica")!;
+  const progreso = progresoCapitulo("compensacion_economica", game);
 
-  const culpable =
-    flags.includes("incumplio_131") ||
-    flags.includes("prueba_infidelidad") ||
-    flags.includes("denuncia_vif");
+  const culpable = flags.includes("incumplio_131") || flags.includes("prueba_infidelidad") || flags.includes("denuncia_vif");
   const bloqueoCulpa = culpable; // simplificación: si el demandante incurrió en causal culposa
-
-  function calcular() {
-    const c = calcularCompensacionEconomica(f);
-    setCalculo(c);
-  }
+  const calculo = calcularCompensacionEconomica(f);
 
   function acordar() {
-    if (!calculo) return;
-    setCE({
+    if (useGame.getState().ce) return;
+    game.setCE({
       beneficiario: personaje.sexo === "femenino" ? "mujer" : "marido",
       factores: f,
       montoEstimado: calculo.monto,
@@ -48,77 +96,117 @@ export default function CompensacionEconomicaPanel() {
       acordada: true,
       ejecutoriada: true,
     });
-    pushLog(`Compensación económica acordada: $${calculo.monto.toLocaleString("es-CL")} en modalidad ${modalidad}.`, "Art. 65 LMC");
+    game.pushLog(`Compensación económica acordada: ${pesos(calculo.monto)} en modalidad ${modalidad}.`, "Art. 65 LMC");
+  }
+
+  if (ce) {
+    const m = MODALIDADES.find((x) => x.id === ce.modalidad);
+    return (
+      <Actividad titulo="Compensación acordada" objetivo={cap.objetivo} progreso={progreso} regla={REGLA} lugar="tribunal" retrato="jueza" animo={ce.bloqueadaPorCulpaGrave ? "duda" : "aprueba"}>
+        <div className="cuerpo">
+          <Consecuencia
+            tono="exito"
+            titulo={`${pesos(ce.montoEstimado)} · ${m?.nombre ?? ce.modalidad}`}
+            narrativa={ce.bloqueadaPorCulpaGrave ? "Consta causal culposa imputable al demandante: el juez podía denegar o disminuir prudencialmente el monto (art. 62 inc. 2° LMC)." : "Acuerdo aprobado y ejecutoriado. La cifra quedará en tu epílogo."}
+            deltas={[{ texto: `Compensación: ${pesos(ce.montoEstimado)}`, signo: "+", tono: "oro" }]}
+            regla={{ articulo: "Art. 65 LMC", texto: m?.desc, codex: "62" }}
+          />
+        </div>
+        <div className="barra-accion"><Link href="/liquidacion" className="btn btn-primario">Ir a liquidación <Icono nombre="division" tam={18} /></Link></div>
+      </Actividad>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      <h2 className="label-art text-neon-blue text-xl">Compensación económica (arts. 61-66 LMC)</h2>
-      <p className="text-parchment/60 text-sm">
-        Procede cuando uno de los cónyuges, por dedicarse al cuidado del hogar o de los hijos
-        o realizar trabajo en menor medida, no pudo desarrollar actividad remunerada durante el
-        matrimonio (art. 61). Los criterios del art. 62 ponderan el "menoscabo económico".
-      </p>
-
-      <div className="terminal p-5 space-y-3">
-        <div className="label-art text-neon-violet text-sm">Factores (art. 62 LMC)</div>
-        <div className="grid md:grid-cols-2 gap-3 text-xs">
-          <label>Duración del matrimonio (años): <input type="number" className="w-20 bg-ink-700 border border-neon-blue/30 p-1 ml-2" value={f.duracionMatrimonioAños} onChange={(e) => setF({ ...f, duracionMatrimonioAños: +e.target.value })} /></label>
-          <label>Edad del beneficiario: <input type="number" className="w-20 bg-ink-700 border border-neon-blue/30 p-1 ml-2" value={f.edadConyugeBeneficiario} onChange={(e) => setF({ ...f, edadConyugeBeneficiario: +e.target.value })} /></label>
-          <label><input type="checkbox" checked={f.saludDeficiente} onChange={(e) => setF({ ...f, saludDeficiente: e.target.checked })} /> Salud deficiente</label>
-          <label><input type="checkbox" checked={f.dedicacionExclusivaHogar} onChange={(e) => setF({ ...f, dedicacionExclusivaHogar: e.target.checked })} /> Dedicación exclusiva al hogar e hijos</label>
-          <label><input type="checkbox" checked={f.colaboracionActividadConyuge} onChange={(e) => setF({ ...f, colaboracionActividadConyuge: e.target.checked })} /> Colaboración en actividad del otro</label>
-          <label>Situación previsional:
-            <select className="bg-ink-700 border border-neon-blue/30 p-1 ml-2" value={f.situacionPrevisional} onChange={(e) => setF({ ...f, situacionPrevisional: e.target.value as any })}>
-              <option value="deficitaria">deficitaria</option><option value="media">media</option><option value="suficiente">suficiente</option>
-            </select>
-          </label>
-          <label>Calificación profesional:
-            <select className="bg-ink-700 border border-neon-blue/30 p-1 ml-2" value={f.calificacionProfesional} onChange={(e) => setF({ ...f, calificacionProfesional: e.target.value as any })}>
-              <option value="baja">baja</option><option value="media">media</option><option value="alta">alta</option>
-            </select>
-          </label>
-          <label>Acceso al mercado laboral:
-            <select className="bg-ink-700 border border-neon-blue/30 p-1 ml-2" value={f.accesoMercadoLaboral} onChange={(e) => setF({ ...f, accesoMercadoLaboral: e.target.value as any })}>
-              <option value="imposible">imposible</option><option value="dificil">difícil</option><option value="factible">factible</option>
-            </select>
-          </label>
-        </div>
-        <button className="btn" onClick={calcular}>▸ Calcular</button>
-      </div>
-
-      {calculo && (
-        <div className="terminal p-5">
-          <div className="label-art text-neon-cyan mb-2">Monto estimado</div>
-          <div className="text-5xl text-neon-blue glitch-text">${calculo.monto.toLocaleString("es-CL")}</div>
-          <div className="mt-3 text-xs space-y-1">
-            {calculo.desglose.map((d, i) => (
-              <div key={i} className="flex justify-between text-parchment/70">
-                <span>{d.factor} <span className="tag tag-violet ml-1">{d.articulo}</span></span>
-                <span className="text-neon-cyan">+${d.aporte.toLocaleString("es-CL")}</span>
-              </div>
-            ))}
-          </div>
-          {bloqueoCulpa && (
-            <div className="mt-3 p-3 border border-neon-red text-neon-red text-xs">
-              ⚠ Causal culposa imputable al demandante (flags activos). El art. 62 inc. 2° LMC autoriza al juez
-              a DENEGAR o disminuir prudencialmente el monto.
-            </div>
-          )}
-          <div className="mt-4">
-            <div className="label-art text-neon-violet text-sm mb-2">Modalidad de pago (art. 65 LMC)</div>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {MODALIDADES.map((m) => (
-                <button key={m.id} onClick={() => setModalidad(m.id)} className={`p-3 border text-left text-xs ${modalidad === m.id ? "border-neon-blue bg-neon-blue/10" : "border-ink-400"}`}>
-                  <div className="text-neon-cyan">{m.nombre}</div>
-                  <div className="text-parchment/60">{m.desc}</div>
+    <Actividad
+      titulo={`${paso + 1}/${PASOS.length} · ${PASOS[paso]}`}
+      objetivo={cap.objetivo}
+      progreso={progreso}
+      regla={REGLA}
+      introClave="intro:ce"
+      lugar="tribunal"
+      retrato="jueza"
+    >
+      <div className="cuerpo gap-3">
+        {paso === 0 && (
+          <>
+            <Contador etiqueta="Duración del matrimonio" sufijo="años" valor={f.duracionMatrimonioAños} min={0} max={70} onCambio={(v) => setF({ ...f, duracionMatrimonioAños: v })} />
+            <Contador etiqueta="Edad del beneficiario" sufijo="años" valor={f.edadConyugeBeneficiario} min={18} max={100} onCambio={(v) => setF({ ...f, edadConyugeBeneficiario: v })} />
+            <div className="grid gap-1.5">
+              {([
+                ["saludDeficiente", "Salud deficiente"],
+                ["dedicacionExclusivaHogar", "Dedicación exclusiva al hogar e hijos"],
+                ["colaboracionActividadConyuge", "Colaboración en actividad del otro"],
+              ] as const).map(([k, label]) => (
+                <button key={k} type="button" role="checkbox" aria-checked={f[k]} className="fila-check" onClick={() => setF({ ...f, [k]: !f[k] })}>
+                  <span className="caja" aria-hidden>{f[k] && <Icono nombre="check" tam={16} grosor={3} />}</span>
+                  {label}
                 </button>
               ))}
             </div>
-          </div>
-          <button className="btn mt-4" onClick={acordar}>▸ Acordar y ejecutoriar</button>
-        </div>
-      )}
-    </div>
+          </>
+        )}
+        {paso === 1 && (
+          <>
+            <Segmentado etiqueta="Situación previsional" valor={f.situacionPrevisional} onCambio={(v) => setF({ ...f, situacionPrevisional: v })} opciones={[{ id: "deficitaria", nombre: "deficitaria" }, { id: "media", nombre: "media" }, { id: "suficiente", nombre: "suficiente" }]} />
+            <Segmentado etiqueta="Calificación profesional" valor={f.calificacionProfesional} onCambio={(v) => setF({ ...f, calificacionProfesional: v })} opciones={[{ id: "baja", nombre: "baja" }, { id: "media", nombre: "media" }, { id: "alta", nombre: "alta" }]} />
+            <Segmentado etiqueta="Acceso al mercado laboral" valor={f.accesoMercadoLaboral} onCambio={(v) => setF({ ...f, accesoMercadoLaboral: v })} opciones={[{ id: "imposible", nombre: "imposible" }, { id: "dificil", nombre: "difícil" }, { id: "factible", nombre: "factible" }]} />
+          </>
+        )}
+        {paso === 2 && (
+          <>
+            <div>
+              <div className="rotulo">Monto estimado</div>
+              <p className="t-display txt-oro cifra">{pesos(calculo.monto)}</p>
+            </div>
+            {bloqueoCulpa && (
+              <p className="tarjeta border-rojo/60 t-meta txt-rojo flex gap-2" role="alert">
+                <Icono nombre="alerta" tam={18} className="mt-0.5" />
+                <span>Causal culposa imputable al demandante (flags activos). El art. 62 inc. 2° LMC autoriza al juez a DENEGAR o disminuir prudencialmente el monto.</span>
+              </p>
+            )}
+            <Paginado
+              items={calculo.desglose}
+              clave={(d) => d.factor}
+              etiqueta="Factores"
+              gap={4}
+              render={(d) => (
+                <div className="flex items-start justify-between gap-2 t-meta border-b border-tinta-600 pb-1">
+                  <span className="txt-2">{d.factor} <span className="articulo ml-1">{d.articulo}</span></span>
+                  <span className="txt-cian cifra shrink-0">+{pesos(d.aporte)}</span>
+                </div>
+              )}
+            />
+          </>
+        )}
+        {paso === 3 && (
+          <Paginado
+            items={MODALIDADES}
+            clave={(m) => m.id}
+            etiqueta="Modalidades"
+            columnas={(w) => (w > 760 ? 2 : 1)}
+            render={(m) => (
+              <button type="button" className="eleccion h-full" aria-pressed={modalidad === m.id} onClick={() => setModalidad(m.id)}>
+                <span className="flex items-center gap-2 w-full">
+                  <span className="caja" aria-hidden>{modalidad === m.id && <Icono nombre="check" tam={16} grosor={3} />}</span>
+                  <span className="font-bold txt-1">{m.nombre}</span>
+                </span>
+                <span className="t-base txt-2">{m.desc}</span>
+              </button>
+            )}
+          />
+        )}
+      </div>
+      <div className="barra-accion">
+        {paso > 0 && <button type="button" className="btn btn-secundario" onClick={() => setPaso(paso - 1)}><Icono nombre="flechaIzq" tam={18} /> Atrás</button>}
+        {paso < PASOS.length - 1 ? (
+          <button type="button" className="btn btn-primario" onClick={() => setPaso(paso + 1)}>
+            {paso === 1 ? "Calcular" : "Siguiente"} <Icono nombre="flechaDer" tam={18} />
+          </button>
+        ) : (
+          <button type="button" className="btn btn-primario" onClick={acordar}>Acordar y ejecutoriar <Icono nombre="balanza" tam={18} /></button>
+        )}
+      </div>
+    </Actividad>
   );
 }

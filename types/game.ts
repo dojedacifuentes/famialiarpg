@@ -220,8 +220,15 @@ export type Logro = {
 };
 
 // ============== STATE GLOBAL ==============
+/** Valor de un hecho único de la partida (decisión, avance de actividad…). */
+export type HechoValor = string | number | boolean | number[];
+
 export type SaveState = {
   version: number;
+  /** Escena resuelta → índice de la opción elegida (-1 si no tenía opciones). Desde v4. */
+  escenas: Record<string, number>;
+  /** Acciones de una sola vez por ciclo vital (evita duplicar recompensas). Desde v4. */
+  hechos: Record<string, HechoValor>;
   creado: number;
   ultimoGuardado: number;
   personaje: Personaje;

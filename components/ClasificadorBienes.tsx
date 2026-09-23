@@ -1,192 +1,223 @@
 "use client";
+// ============================================================================
+// CLASIFICADOR DEL HABER — arts. 1725, 1726, 1727, 1736, 150 CC.
+// Un caso por diapositiva. El avance vive en el guardado (hechos), así que
+// recargar o volver no repite casos ni duplica bienes. Los casos fallados
+// vuelven en una "segunda revisión": aprender del error sin castigo extra.
+// Recompensa por comprensión: +1 Inteligencia jurídica sólo si aciertas al
+// primer intento y sin consultar la pista.
+// ============================================================================
 import { useMemo, useState } from "react";
 import { useGame } from "@/store/useGame";
-import { clasificarBien } from "@/lib/reglas";
-import type { Bien, ClaseBien, NaturalezaBien } from "@/types/game";
-import { motion, AnimatePresence } from "framer-motion";
+import { asientoRecompensa, clasificarCaso } from "@/lib/clasificacion";
+import type { Bien, ClaseBien } from "@/types/game";
+import { CASOS_HABER } from "@/data/casos";
+import { ICONO_NATURALEZA, NOMBRE_CLASE, NOMBRE_NATURALEZA, pesos } from "@/data/escenario";
+import { capitulo, progresoCapitulo } from "@/data/capitulos";
+import Actividad from "@/components/ui/Actividad";
+import Consecuencia, { BotonContinuar } from "@/components/ui/Consecuencia";
+import { useLectura } from "@/components/ui/Ajuste";
+import Icono from "@/components/ui/Icono";
+import { conCambios } from "@/lib/cambios";
+import type { Delta } from "@/lib/deltas";
+import Link from "next/link";
 
-type Caso = {
-  nombre: string;
-  valor: number;
-  naturaleza: NaturalezaBien;
-  fuente: Bien["fuente"];
-  tituloOnerosoOGratuito?: "oneroso" | "gratuito";
-  adquiridoAntesDelMatrimonio?: boolean;
-  subroga?: { delConyuge: "marido" | "mujer"; eraInmueble: boolean };
-  pista: string;
-};
+const CLASES: ClaseBien[] = ["haber_absoluto", "haber_relativo", "propio_marido", "propio_mujer", "reservado_art150"];
 
-// 22 casos rigurosos cubriendo todas las hipótesis del art. 1725 + 150 + 1726 + 1736 + 1727 + 1733 + 1739 + 1746.
-const CASOS: Caso[] = [
-  // -- HABER ABSOLUTO (art. 1725 N°1) --
-  { nombre: "Sueldo del marido devengado en marzo", valor: 1_500_000, naturaleza: "dinero", fuente: "trabajo", tituloOnerosoOGratuito: "oneroso", pista: "Salario devengado durante la sociedad. Art. 1725 N°1." },
-  { nombre: "Bono de fin de año del marido", valor: 2_500_000, naturaleza: "dinero", fuente: "trabajo", tituloOnerosoOGratuito: "oneroso", pista: "Emolumento del empleo." },
-  { nombre: "Honorarios profesionales del marido", valor: 4_000_000, naturaleza: "dinero", fuente: "trabajo", tituloOnerosoOGratuito: "oneroso", pista: "Producto del trabajo durante la vigencia." },
-
-  // -- PATRIMONIO RESERVADO ART. 150 --
-  { nombre: "Sueldo de la mujer en empresa propia (trabajo separado del marido)", valor: 1_800_000, naturaleza: "dinero", fuente: "trabajo_separado_mujer", pista: "Trabajo separado de la mujer en SC: patrimonio reservado." },
-  { nombre: "Inmueble adquirido por la mujer con su sueldo separado", valor: 50_000_000, naturaleza: "inmueble", fuente: "trabajo_separado_mujer", pista: "Adquirido con producto del trabajo separado." },
-  { nombre: "Honorarios docentes de la mujer (cátedra particular)", valor: 600_000, naturaleza: "dinero", fuente: "trabajo_separado_mujer", pista: "Trabajo separado de la mujer." },
-
-  // -- HABER ABSOLUTO (art. 1725 N°2) — Frutos --
-  { nombre: "Cosecha del fundo propio del marido", valor: 4_000_000, naturaleza: "fungible", fuente: "frutos", pista: "Frutos naturales de bien propio: haber absoluto." },
-  { nombre: "Intereses bancarios devengados durante la sociedad", valor: 800_000, naturaleza: "dinero", fuente: "frutos", pista: "Frutos civiles." },
-  { nombre: "Renta de arrendamiento del inmueble propio de la mujer", valor: 1_200_000, naturaleza: "dinero", fuente: "frutos", pista: "Frutos civiles de bien propio durante la sociedad." },
-
-  // -- HABER ABSOLUTO (art. 1725 N°5) — Adquisiciones a título oneroso durante --
-  { nombre: "Auto comprado durante el matrimonio con dineros sociales", valor: 12_000_000, naturaleza: "mueble", fuente: "compra", tituloOnerosoOGratuito: "oneroso", pista: "Mueble adquirido a título oneroso durante vigencia." },
-  { nombre: "Departamento comprado durante el matrimonio", valor: 90_000_000, naturaleza: "inmueble", fuente: "compra", tituloOnerosoOGratuito: "oneroso", pista: "Inmueble adquirido a título oneroso durante vigencia." },
-  { nombre: "Acciones bursátiles compradas con utilidades sociales", valor: 20_000_000, naturaleza: "valor_mobiliario", fuente: "compra", tituloOnerosoOGratuito: "oneroso", pista: "Valor mobiliario adquirido a título oneroso." },
-
-  // -- BIEN PROPIO (art. 1726) — Inmueble a título gratuito durante --
-  { nombre: "Casa heredada del abuelo del marido durante el matrimonio", valor: 80_000_000, naturaleza: "inmueble", fuente: "herencia", tituloOnerosoOGratuito: "gratuito", pista: "Inmueble adquirido a título gratuito durante: propio del heredero." },
-  { nombre: "Parcela donada a la mujer por su madre durante el matrimonio", valor: 60_000_000, naturaleza: "inmueble", fuente: "donacion", tituloOnerosoOGratuito: "gratuito", pista: "Inmueble a título gratuito durante vigencia: propio." },
-
-  // -- HABER RELATIVO (art. 1725 N°4) — Mueble a título gratuito durante --
-  { nombre: "Joyas donadas por una tía al marido durante el matrimonio", valor: 2_000_000, naturaleza: "mueble", fuente: "donacion", tituloOnerosoOGratuito: "gratuito", pista: "Mueble a título gratuito durante vigencia: haber relativo con recompensa." },
-  { nombre: "Auto recibido como legado por la mujer durante el matrimonio", valor: 15_000_000, naturaleza: "mueble", fuente: "herencia", tituloOnerosoOGratuito: "gratuito", pista: "Mueble a título gratuito durante vigencia." },
-
-  // -- HABER RELATIVO (art. 1725 N°3) — Dinero --
-  { nombre: "Premio en efectivo recibido por la mujer durante el matrimonio", valor: 5_000_000, naturaleza: "dinero", fuente: "donacion", tituloOnerosoOGratuito: "gratuito", pista: "Dinero a título gratuito durante vigencia: art. 1725 N°3." },
-
-  // -- BIENES APORTADOS ANTES DEL MATRIMONIO --
-  { nombre: "Inmueble adquirido por el marido antes del matrimonio", valor: 100_000_000, naturaleza: "inmueble", fuente: "compra", adquiridoAntesDelMatrimonio: true, tituloOnerosoOGratuito: "oneroso", pista: "Inmueble anterior al matrimonio: propio (art. 1736)." },
-  { nombre: "Mil libros aportados al casarse", valor: 3_000_000, naturaleza: "mueble", fuente: "compra", adquiridoAntesDelMatrimonio: true, tituloOnerosoOGratuito: "oneroso", pista: "Muebles aportados al matrimonio: haber relativo." },
-  { nombre: "$10.000.000 en cuenta de ahorro aportados al casarse", valor: 10_000_000, naturaleza: "dinero", fuente: "compra", adquiridoAntesDelMatrimonio: true, pista: "Dinero aportado al matrimonio: haber relativo art. 1725 N°3." },
-
-  // -- SUBROGACIÓN REAL --
-  { nombre: "Inmueble adquirido en subrogación del inmueble propio anterior del marido", valor: 70_000_000, naturaleza: "inmueble", fuente: "subrogacion", subroga: { delConyuge: "marido", eraInmueble: true }, pista: "Subrogación de inmueble propio: art. 1727 N°1 y 1733." },
-
-  // -- MEJORAS A BIEN PROPIO CON DINEROS SOCIALES (art. 1746) --
-  { nombre: "Ampliación del inmueble propio del marido pagada con dineros sociales", valor: 8_000_000, naturaleza: "inmueble", fuente: "mejora_propio", pista: "Mejora a bien propio con dineros sociales: el bien sigue siendo propio pero la sociedad tiene recompensa (art. 1746)." },
-
-  // -- INDEMNIZACIÓN --
-  { nombre: "Indemnización por accidente laboral del marido durante el matrimonio", valor: 6_000_000, naturaleza: "dinero", fuente: "indemnizacion", pista: "Indemnización durante la vigencia: regla general haber absoluto." },
-];
-
-const CLASES: { id: ClaseBien; nombre: string; color: string }[] = [
-  { id: "haber_absoluto", nombre: "Haber Absoluto", color: "border-neon-blue text-neon-blue" },
-  { id: "haber_relativo", nombre: "Haber Relativo (con recompensa)", color: "border-neon-violet text-neon-violet" },
-  { id: "propio_marido", nombre: "Propio Marido", color: "border-neon-amber text-neon-amber" },
-  { id: "propio_mujer", nombre: "Propio Mujer", color: "border-neon-amber text-neon-amber" },
-  { id: "reservado_art150", nombre: "Reservado Art. 150", color: "border-neon-cyan text-neon-cyan" },
-];
+type Resultado = { i: number; elegida: ClaseBien; ok: boolean; correcta: ClaseBien; justificacion: string; articulo: string; deltas: Delta[]; repaso: boolean; pista: boolean };
 
 export default function ClasificadorBienes() {
   const game = useGame();
-  const [i, setI] = useState(0);
-  const [feedback, setFeedback] = useState<null | { ok: boolean; justif: string; art: string; correcta: ClaseBien }>(null);
-  const [aciertos, setAciertos] = useState(0);
+  const { hechos, personaje } = game;
+  const [resultado, setResultado] = useState<Resultado | null>(null);
+  const lectura = useLectura();
+  const cap = capitulo("haber")!;
 
-  const caso = CASOS[i];
-  const correcta = useMemo(
-    () => (caso ? clasificarBien({ id: "x", nombre: caso.nombre, valor: caso.valor, naturaleza: caso.naturaleza, fuente: caso.fuente, tituloOnerosoOGratuito: caso.tituloOnerosoOGratuito, adquiridoAntesDelMatrimonio: caso.adquiridoAntesDelMatrimonio, subroga: caso.subroga }, game.personaje.sexo) : null),
-    [caso, game.personaje.sexo]
-  );
+  const pendientes = CASOS_HABER.map((_, i) => i).filter((i) => !(`haber:${i}` in hechos));
+  const repaso = CASOS_HABER.map((_, i) => i).filter((i) => hechos[`haber:${i}`] === "error" && !(`haber:rep:${i}` in hechos));
+  const enRepaso = pendientes.length === 0;
+  const actual = enRepaso ? repaso[0] : pendientes[0];
+  const caso = actual !== undefined ? CASOS_HABER[actual] : undefined;
+  const pistaVista = actual !== undefined && `haber:pista:${actual}` in hechos;
+  const aciertos = CASOS_HABER.filter((_, i) => hechos[`haber:${i}`] === "ok").length;
+  const progreso = progresoCapitulo("haber", game);
 
-  if (!caso) {
-    const porcentaje = Math.round((aciertos / CASOS.length) * 100);
+  const corr = useMemo(() => (caso ? clasificarCaso(caso, personaje.sexo) : null), [caso, personaje.sexo]);
+
+  function responder(c: ClaseBien) {
+    if (!caso || !corr || actual === undefined) return;
+    const i = actual;
+    const clave = enRepaso ? `haber:rep:${i}` : `haber:${i}`;
+    const ok = corr.clase === c;
+    let registrado = false;
+    const deltas = conCambios(() => {
+      registrado = game.registrarHecho(clave, ok ? "ok" : "error");
+      if (!registrado) return;
+      if (ok) {
+        if (!enRepaso && !pistaVista) game.ajustarAtributo("inteligencia_juridica", 1);
+        const bien: Bien = {
+          id: `haber-c${personaje.cicloVital}-${i}`,
+          nombre: caso.nombre,
+          valor: caso.valor,
+          naturaleza: caso.naturaleza,
+          fuente: caso.fuente,
+          tituloOnerosoOGratuito: caso.tituloOnerosoOGratuito,
+          adquiridoAntesDelMatrimonio: caso.adquiridoAntesDelMatrimonio,
+          subroga: caso.subroga,
+          clase: corr.clase,
+          generaRecompensa: corr.recompensa,
+        };
+        game.addBien(bien);
+        if (corr.recompensa > 0) {
+          game.addRecompensa({
+            id: `rec-c${personaje.cicloVital}-${i}`,
+            ...asientoRecompensa(caso, corr.adquirente),
+            monto: corr.recompensa,
+            motivo: `Por ${caso.nombre}`,
+            articulo: corr.articulo,
+          });
+        }
+        game.pushLog(`Clasificaste correctamente: ${caso.nombre} → ${NOMBRE_CLASE[corr.clase]}`, corr.articulo);
+      } else if (!enRepaso) {
+        game.ajustarTrauma(1);
+        game.pushLog(`Error en ${caso.nombre}. La doctrina te juzga.`, "GLITCH");
+      }
+    });
+    if (!registrado) return;
+    setResultado({ i, elegida: c, ok, correcta: corr.clase, justificacion: corr.justificacion, articulo: corr.articulo, deltas, repaso: enRepaso, pista: pistaVista });
+  }
+
+  function terminar() {
+    const st = useGame.getState();
+    const ok = CASOS_HABER.filter((_, i) => st.hechos[`haber:${i}`] === "ok").length;
+    if (ok / CASOS_HABER.length >= 0.8) {
+      st.desbloquearLogro({ id: "haber_notarial", titulo: "Intuición notarial", descripcion: "Clasificaste al menos el 80 % del haber al primer intento.", articulo: "Art. 1725 CC", desbloqueado: true });
+    }
+    st.registrarHecho("haber:fin");
+  }
+
+  const regla = {
+    titulo: "Clasificación del haber",
+    parrafos: [
+      <>Distingue tres ejes: <b>naturaleza</b> (mueble/inmueble/dinero) — <b>título</b> (oneroso/gratuito) — <b>momento</b> (antes/durante). Si tu personaje es mujer en SC, recuerda el patrimonio reservado del art. 150.</>,
+    ],
+    articulo: "Arts. 1725, 1726, 1727, 1736, 150 CC",
+  };
+
+  // ── Resultado de un caso ──────────────────────────────────────────────
+  if (resultado) {
+    const r = resultado;
     return (
-      <div className="terminal p-6">
-        <h2 className="label-art text-neon-blue text-xl mb-3">Clasificación completa</h2>
-        <p className="text-parchment/70 text-sm mb-4">
-          Resultado: <b className="text-neon-cyan">{aciertos}</b> de <b>{CASOS.length}</b> aciertos ({porcentaje}%).
-          {porcentaje >= 80 && " Tu intuición patrimonial es notarial."}
-          {porcentaje < 50 && " Vuelve al codex y relee los arts. 1725, 1726, 1727 y 1736."}
-        </p>
-        <p className="text-parchment/60 text-xs">Los bienes correctamente clasificados se han registrado en tu inventario.</p>
-      </div>
+      <Actividad titulo={r.repaso ? "Segunda revisión" : `Caso ${r.i + 1} de ${CASOS_HABER.length}`} progreso={progreso} regla={regla} lugar="despacho" retrato="contador" animo={r.ok ? "aprueba" : "duda"}>
+        <div className="cuerpo">
+          <Consecuencia
+            reinicio={`${r.i}-${r.repaso}`}
+            lectura={lectura}
+            tono={r.ok ? "exito" : "fallo"}
+            titulo={r.ok ? `Correcto: ${NOMBRE_CLASE[r.correcta]}` : `La respuesta era: ${NOMBRE_CLASE[r.correcta]}`}
+            narrativa={
+              r.ok
+                ? r.repaso ? "Esta vez lo viste. El bien queda inscrito en tu inventario." : r.pista ? "Correcto, con ayuda de la pista: el bien entra al inventario, sin bonificación." : "El contador asiente sin levantar la vista. El bien entra a tu inventario."
+                : `Elegiste «${NOMBRE_CLASE[r.elegida]}». ${r.repaso ? "Queda para el códex: relee la regla." : "Este caso volverá en la segunda revisión."}`
+            }
+            deltas={r.deltas}
+            regla={{ articulo: r.articulo, texto: r.justificacion, codex: "1725" }}
+          />
+        </div>
+        <div className="barra-accion">
+          <BotonContinuar lectura={lectura} onClick={() => setResultado(null)}>
+            Siguiente caso <Icono nombre="flechaDer" tam={18} />
+          </BotonContinuar>
+        </div>
+      </Actividad>
     );
   }
 
-  function elegir(c: ClaseBien) {
-    if (!correcta) return;
-    const ok = correcta.clase === c;
-    setFeedback({ ok, justif: correcta.justificacion, art: correcta.articulo, correcta: correcta.clase });
-    if (ok) {
-      setAciertos((a) => a + 1);
-      game.ajustarAtributo("inteligencia_juridica", 1);
-      const bien: Bien = {
-        id: `b${Date.now()}-${i}`,
-        nombre: caso.nombre,
-        valor: caso.valor,
-        naturaleza: caso.naturaleza,
-        fuente: caso.fuente,
-        tituloOnerosoOGratuito: caso.tituloOnerosoOGratuito,
-        adquiridoAntesDelMatrimonio: caso.adquiridoAntesDelMatrimonio,
-        subroga: caso.subroga,
-        clase: correcta.clase,
-        generaRecompensa: correcta.recompensa,
-      };
-      game.addBien(bien);
-      if (correcta.recompensa > 0) {
-        game.addRecompensa({
-          id: `r${Date.now()}-${i}`,
-          acreedor: game.personaje.sexo === "femenino" ? "mujer" : "marido",
-          deudor: "sociedad",
-          monto: correcta.recompensa,
-          motivo: `Por ${caso.nombre}`,
-          articulo: correcta.articulo,
-        });
-      }
-      game.pushLog(`Clasificaste correctamente: ${caso.nombre} → ${correcta.clase}`, correcta.articulo);
-    } else {
-      game.ajustarTrauma(1);
-      game.pushLog(`Error en ${caso.nombre}. La doctrina te juzga.`, "GLITCH");
-    }
+  // ── Fin ───────────────────────────────────────────────────────────────
+  if (!caso || !corr) {
+    const porcentaje = Math.round((aciertos / CASOS_HABER.length) * 100);
+    const terminado = "haber:fin" in hechos;
+    return (
+      <Actividad titulo="Clasificación completa" objetivo={cap.objetivo} progreso={progreso} regla={regla} lugar="despacho" retrato="contador" animo={porcentaje >= 80 ? "aprueba" : "neutral"}>
+        <div className="cuerpo">
+          <Consecuencia
+            tono={porcentaje >= 50 ? "exito" : "fallo"}
+            titulo={`${aciertos} de ${CASOS_HABER.length} aciertos al primer intento (${porcentaje} %).`}
+            narrativa={
+              <>
+                {porcentaje >= 80 && "Tu intuición patrimonial es notarial. "}
+                {porcentaje < 50 && "Vuelve al codex y relee los arts. 1725, 1726, 1727 y 1736. "}
+                Los bienes correctamente clasificados se han registrado en tu inventario.
+              </>
+            }
+            deltas={porcentaje >= 80 ? [{ texto: "Logro disponible: Intuición notarial", signo: "•", tono: "oro" }] : []}
+            regla={{ articulo: "Art. 1725 CC", texto: "Composición del haber social.", codex: "1725" }}
+          />
+        </div>
+        <div className="barra-accion">
+          <Link href="/inventario" className="btn btn-secundario">Ver inventario</Link>
+          {terminado ? (
+            <Link href="/juego" className="btn btn-primario">Volver al mapa <Icono nombre="mapa" tam={18} /></Link>
+          ) : (
+            <button type="button" className="btn btn-primario" onClick={terminar}>Cerrar el despacho <Icono nombre="check" tam={18} /></button>
+          )}
+        </div>
+      </Actividad>
+    );
   }
 
-  const tituloLabel = caso.tituloOnerosoOGratuito ? ` · título ${caso.tituloOnerosoOGratuito}` : "";
+  // ── Caso actual ───────────────────────────────────────────────────────
+  const chips = [
+    NOMBRE_NATURALEZA[caso.naturaleza],
+    caso.fuente.replace(/_/g, " "),
+    caso.tituloOnerosoOGratuito ? `título ${caso.tituloOnerosoOGratuito}` : null,
+    caso.adquiridoAntesDelMatrimonio ? "antes del matrimonio" : "durante el matrimonio",
+  ].filter(Boolean) as string[];
 
   return (
-    <div className="space-y-4">
-      <h2 className="label-art text-neon-blue text-xl">Clasificación del Haber (arts. 1725, 1726, 1727, 1736, 150 CC)</h2>
-      <p className="text-parchment/60 text-xs">
-        Distingue tres ejes: <b>naturaleza</b> (mueble/inmueble/dinero) — <b>título</b> (oneroso/gratuito) — <b>momento</b> (antes/durante). Si tu personaje es mujer en SC, recuerda el patrimonio reservado del art. 150.
-      </p>
-
-      <div className="terminal p-5">
-        <div className="text-xs tag mb-2">CASO {i + 1} / {CASOS.length}</div>
-        <div className="text-parchment text-lg label-art">{caso.nombre}</div>
-        <div className="text-parchment/60 text-xs mt-1">
-          Valor: ${caso.valor.toLocaleString("es-CL")} · Naturaleza: <b>{caso.naturaleza}</b> · Fuente: {caso.fuente.replace(/_/g, " ")}
-          {tituloLabel} · {caso.adquiridoAntesDelMatrimonio ? "antes del matrimonio" : "durante el matrimonio"}
-        </div>
-        <div className="text-neon-violet text-xs italic mt-3">Pista: {caso.pista}</div>
-      </div>
-
-      <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-2">
-        {CLASES.map((c) => (
-          <button
-            key={c.id}
-            disabled={!!feedback}
-            onClick={() => elegir(c.id)}
-            className={`p-3 border ${c.color} text-xs uppercase tracking-widest disabled:opacity-40`}
-          >
-            {c.nombre}
+    <Actividad
+      titulo={enRepaso ? `Segunda revisión · ${repaso.length} por revisar` : `Caso ${actual! + 1} de ${CASOS_HABER.length}`}
+      objetivo={cap.objetivo}
+      progreso={progreso}
+      regla={regla}
+      introClave="intro:haber"
+      lugar="despacho"
+      retrato="contador"
+      accion={
+        !pistaVista ? (
+          <button type="button" className="btn btn-secundario" onClick={() => game.registrarHecho(`haber:pista:${actual}`)} title="Consultar pista (sin bonificación de Inteligencia jurídica)">
+            <Icono nombre="lampara" tam={18} /> Pista
           </button>
-        ))}
+        ) : undefined
+      }
+    >
+      <div className="cuerpo gap-2">
+        <article className="tarjeta tarjeta-alta" aria-label="Bien a clasificar">
+          <h3 className="t-base font-bold txt-1 flex gap-2">
+            <Icono nombre={ICONO_NATURALEZA[caso.naturaleza] ?? "documento"} tam={22} className="txt-oro mt-0.5" />
+            <span>{caso.nombre}</span>
+          </h3>
+          <p className="t-meta txt-2 mt-1">
+            <span className="txt-oro cifra font-bold">{pesos(caso.valor)}</span> · {chips.join(" · ")}
+          </p>
+          {pistaVista && (
+            <p className="t-meta txt-violeta flex gap-1.5 mt-1"><Icono nombre="lampara" tam={16} className="mt-0.5" /> <span>Pista: {caso.pista}</span></p>
+          )}
+        </article>
+        <div className="mt-auto">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-2 mb-1.5">
+            <span className="rotulo" id="clases-haber">¿Dónde va este bien?</span>
+            <span className="t-micro txt-3">{pistaVista ? "Con pista: sin bonificación" : "Sin pista: +1 Int. jurídica si aciertas"}</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2" role="group" aria-labelledby="clases-haber">
+            {CLASES.map((c) => (
+              <button key={c} type="button" className="btn btn-secundario text-left justify-start" onClick={() => responder(c)}>
+                {NOMBRE_CLASE[c]}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
-
-      <AnimatePresence>
-        {feedback && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className={`terminal p-4 ${feedback.ok ? "border-neon-blue" : "border-neon-red"}`}
-          >
-            <div className={`label-art ${feedback.ok ? "text-neon-blue" : "text-neon-red"}`}>
-              {feedback.ok ? "✓ Clasificación correcta" : `✗ Incorrecto — la respuesta era: ${feedback.correcta}`}
-            </div>
-            <div className="text-parchment/80 text-xs mt-2">{feedback.justif}</div>
-            <div className="tag tag-violet mt-2">{feedback.art}</div>
-            <button className="btn mt-3" onClick={() => { setFeedback(null); setI((x) => x + 1); }}>
-              ▸ Siguiente caso
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    </Actividad>
   );
 }

@@ -1,9 +1,22 @@
 "use client";
-import { useGame } from "@/store/useGame";
-import { liquidar } from "@/lib/reglas";
+// ============================================================================
+// LIQUIDACIÓN — jefe final patrimonial en nueve fases, una por diapositiva.
+// La fase actual se guarda (recargar no reinicia). Cálculos originales de
+// lib/reglas.ts; cada fase muestra su justificación normativa.
+// ============================================================================
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { motion } from "framer-motion";
+import { useGame, useMontado } from "@/store/useGame";
+import { liquidar } from "@/lib/reglas";
+import { generarEpilogo } from "@/lib/epilogo";
+import type { Bien, Recompensa } from "@/types/game";
+import GameShell from "@/components/ui/GameShell";
+import { Paginado } from "@/components/ui/Ajuste";
+import Icono from "@/components/ui/Icono";
+import Escenario from "@/components/arte/Escenario";
+import { pesos } from "@/data/escenario";
 
 type Fase =
   | "facción_inventario"   // Art. 1765 CC
@@ -28,227 +41,208 @@ const FASES: { id: Fase; titulo: string; desc: string; art: string }[] = [
   { id: "cierre", titulo: "9. Cierre del expediente", desc: "Acta final firmada por los cónyuges o por el partidor. Notificaciones.", art: "Arts. 1788, 1825 CC supletoriamente" },
 ];
 
+function Cifra({ etiqueta, valor, tono = "txt-oro" }: { etiqueta: string; valor: number; tono?: string }) {
+  return (
+    <div className="tarjeta text-center">
+      <div className="t-meta txt-3">{etiqueta}</div>
+      <motion.div key={valor} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className={`t-titulo cifra ${tono}`}>{pesos(valor)}</motion.div>
+    </div>
+  );
+}
+
 export default function LiquidacionPage() {
   const router = useRouter();
+  const montado = useMontado();
   const game = useGame();
-  const [fase, setFase] = useState<Fase>("facción_inventario");
+  const [confirmarLoop, setConfirmarLoop] = useState(false);
+
+  useEffect(() => {
+    if (montado && !game.personaje.nombre) router.replace("/creacion");
+  }, [montado, game.personaje.nombre, router]);
 
   const calc = useMemo(() => liquidar(game.bienes), [game.bienes]);
+  const idx = Math.min(FASES.length - 1, Number(game.hechos["liq:fase"] ?? 0));
+  const f = FASES[idx];
 
-  function siguiente() {
-    const idx = FASES.findIndex((f) => f.id === fase);
-    if (idx < FASES.length - 1) setFase(FASES[idx + 1].id);
-    else cerrar();
+  if (!montado || !game.personaje.nombre) return <GameShell titulo="Liquidación" stats={false}><div /></GameShell>;
+
+  function irA(i: number) {
+    game.fijarAvance("liq:fase", Math.max(0, Math.min(FASES.length - 1, i)));
   }
 
   function cerrar() {
-    const epilogo = generarEpilogo(game, calc);
-    game.finalizar(epilogo);
+    const st = useGame.getState();
+    st.finalizar(generarEpilogo(st, calc));
     router.push("/epilogo");
   }
 
-  const f = FASES.find((x) => x.id === fase)!;
+  const sociales = game.bienes.filter((b) => b.clase === "haber_absoluto" || b.clase === "haber_relativo");
+  const propios = game.bienes.filter((b) => b.clase.startsWith("propio"));
+  const reservados = game.bienes.filter((b) => b.clase === "reservado_art150" || b.clase === "satelite_art166" || b.clase === "satelite_art167");
+  const familiares = game.bienes.filter((b) => b.declaradoBienFamiliar || b.clase === "familiar");
+  const opcion150 = game.hechos["opcion150"] as string | undefined;
 
-  return (
-    <main className="min-h-screen px-6 py-8 max-w-5xl mx-auto">
-      <header className="flex justify-between items-center mb-6">
-        <Link href="/juego" className="btn">◂ Mapa</Link>
-        <div className="tag tag-red">BOSS FINAL · LIQUIDACIÓN (arts. 1765-1788 CC)</div>
-      </header>
+  const grupos = [
+    { t: "Bienes sociales", items: sociales },
+    { t: "Bienes propios", items: propios },
+    { t: "Patrimonio reservado y satélite", items: reservados },
+    { t: "Bienes familiares", items: familiares },
+  ];
 
-      <div className="terminal p-6 mb-4">
-        <div className="flex gap-1 mb-4 flex-wrap">
-          {FASES.map((x) => (
-            <span key={x.id} className={`tag ${x.id === fase ? "tag-amber" : ""}`}>
-              {x.titulo.split(".")[0]}
-            </span>
-          ))}
-        </div>
-        <h1 className="label-art text-2xl text-neon-blue">{f.titulo}</h1>
-        <p className="text-parchment/70 text-sm mt-1">{f.desc}</p>
-        <div className="tag tag-violet mt-2">{f.art}</div>
+  // Cada fase se aplana en filas que se paginan juntas: la explicación
+  // normativa, las cifras y los bienes nunca se empujan fuera de la pantalla.
+  type Fila = { k: string; nodo: ReactNode };
+  const filaBien = (b: Bien, pref: string): Fila => ({
+    k: `${pref}-${b.id}`,
+    nodo: (
+      <div className="flex justify-between gap-2 t-meta border-b border-tinta-600 pb-1">
+        <span className="txt-1">{b.nombre}</span><span className="txt-oro cifra shrink-0">{pesos(b.valor)}</span>
       </div>
+    ),
+  });
+  const titulo = (k: string, t: string, tono = "txt-cian"): Fila => ({ k, nodo: <div className={`rotulo ${tono} pt-1`}>{t}</div> });
+  const vacio = (k: string, t = "—"): Fila => ({ k, nodo: <p className="t-meta txt-3">{t}</p> });
 
-      {fase === "facción_inventario" && <Inventario bienes={game.bienes} />}
-      {fase === "tasacion" && <Tasacion total={calc.acervoBruto} />}
-      {fase === "deducciones" && <Deducciones bajas={calc.bajasGenerales} bruto={calc.acervoBruto} liquido={calc.acervoLiquido} />}
-      {fase === "recompensas" && <Recompensas recompensas={game.recompensas} />}
-      {fase === "computar_gananciales" && <Gananciales valor={calc.gananciales} />}
-      {fase === "particion_concreta" && <Particion gananciales={calc.gananciales} cuota={calc.cuotaPorConyuge} />}
-      {fase === "adjudicacion" && <Adjudicacion bienes={game.bienes} />}
-      {fase === "inscripcion" && <InscripcionConservatoria />}
-      {fase === "cierre" && (
-        <div className="terminal p-6">
-          <h2 className="label-art text-neon-cyan text-xl mb-2">Acta de cierre</h2>
-          <p className="text-parchment/70 text-sm mb-4">
-            La liquidación ha terminado. Tus bienes propios y reservados subsisten para tu segunda vida.
-            ¿Cerrás el expediente o intentás rehacer tu vida?
-          </p>
-          <div className="flex gap-2 flex-wrap">
-            <button className="btn btn-danger" onClick={cerrar}>▸ Cerrar y leer epílogo</button>
-            <button className="btn" onClick={() => { game.iniciarSegundaVida(); router.push("/juego"); }}>↻ Comenzar segunda vida (loop)</button>
+  const filas: Fila[] = [
+    { k: "desc", nodo: <div className="space-y-1.5"><p className="t-base txt-2">{f.desc}</p><span className="articulo">{f.art}</span></div> },
+  ];
+  switch (f.id) {
+    case "facción_inventario":
+      grupos.forEach((g, gi) => {
+        filas.push(titulo(`g${gi}`, `${g.t} (${g.items.length})`));
+        if (g.items.length === 0) filas.push(vacio(`g${gi}-v`));
+        g.items.forEach((b) => filas.push(filaBien(b, `g${gi}`)));
+      });
+      break;
+    case "tasacion":
+      filas.push({ k: "c", nodo: <Cifra etiqueta="Avalúo del haber social" valor={calc.acervoBruto} /> });
+      filas.push({ k: "n", nodo: <p className="t-meta txt-2">Suma actualizada de bienes sociales (haber absoluto + relativo).</p> });
+      break;
+    case "deducciones":
+      filas.push({
+        k: "c",
+        nodo: (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <Cifra etiqueta="Bruto" valor={calc.acervoBruto} tono="txt-cian" />
+            <Cifra etiqueta="– Bajas (art. 959)" valor={calc.bajasGenerales} tono="txt-rojo" />
+            <Cifra etiqueta="= Líquido" valor={calc.acervoLiquido} />
           </div>
-        </div>
-      )}
+        ),
+      });
+      break;
+    case "recompensas":
+      filas.push(titulo("t", "Libro de recompensas (arts. 1769-1779)", "txt-violeta"));
+      if (game.recompensas.length === 0) filas.push(vacio("v", "Sin recompensas pendientes."));
+      game.recompensas.forEach((r: Recompensa) =>
+        filas.push({
+          k: r.id,
+          nodo: (
+            <div className="tarjeta t-meta">
+              <div className="flex justify-between gap-2"><span className="txt-1">{r.deudor} → {r.acreedor}</span><span className="txt-violeta cifra">{pesos(r.monto)}</span></div>
+              <div className="txt-2">{r.motivo} {r.articulo && <span className="articulo ml-1">{r.articulo}</span>}</div>
+            </div>
+          ),
+        })
+      );
+      break;
+    case "computar_gananciales":
+      filas.push({ k: "c", nodo: <Cifra etiqueta="Gananciales (art. 1773 CC)" valor={calc.gananciales} /> });
+      break;
+    case "particion_concreta":
+      filas.push({
+        k: "c",
+        nodo: (
+          <div className="grid grid-cols-2 gap-2">
+            <Cifra etiqueta="Gananciales" valor={calc.gananciales} tono="txt-cian" />
+            <Cifra etiqueta="Cuota por cónyuge" valor={calc.cuotaPorConyuge} tono="txt-violeta" />
+          </div>
+        ),
+      });
+      if (opcion150) {
+        filas.push({ k: "o", nodo: <p className="tarjeta t-meta txt-2 flex gap-2"><Icono nombre="llave" tam={16} className="txt-oro mt-0.5" /> Ejerciste la opción del art. 150 inc. final: {opcion150 === "aceptar" ? "aceptaste los gananciales." : "renunciaste a los gananciales y conservas tu reservado."}</p> });
+      }
+      break;
+    case "adjudicacion": {
+      const a = game.bienes.filter((_, i) => i % 2 === 0);
+      const b = game.bienes.filter((_, i) => i % 2 === 1);
+      filas.push(titulo("ha", `Hijuela A (${a.length})`));
+      if (a.length === 0) filas.push(vacio("hav"));
+      a.forEach((x) => filas.push(filaBien(x, "a")));
+      filas.push(titulo("hb", `Hijuela B (${b.length})`));
+      if (b.length === 0) filas.push(vacio("hbv"));
+      b.forEach((x) => filas.push(filaBien(x, "b")));
+      break;
+    }
+    case "inscripcion":
+      filas.push({
+        k: "t",
+        nodo: (
+          <p className="t-lectura txt-1">
+            Las adjudicaciones de inmuebles deben inscribirse en el CBR competente para que produzcan tradición y sean
+            oponibles a terceros (arts. 686, 687 CC y Reglamento del CBR). Sin inscripción, el adjudicatario es solo
+            un titular obligacional, no dueño frente a terceros.
+          </p>
+        ),
+      });
+      break;
+    case "cierre":
+      filas.push({
+        k: "t",
+        nodo: (
+          <p className="t-lectura txt-1">
+            {confirmarLoop
+              ? `Se cerrará el ciclo ${game.personaje.cicloVital} sin leer el epílogo: conservas bienes propios, reservados y satélites, hijos, logros y atributos.`
+              : "La liquidación ha terminado. Tus bienes propios y reservados subsisten para tu segunda vida. ¿Cerrás el expediente o intentás rehacer tu vida?"}
+          </p>
+        ),
+      });
+      break;
+  }
 
-      <div className="mt-6 flex gap-2">
-        <button className="btn" onClick={siguiente}>▸ Avanzar a la siguiente fase</button>
+  return (
+    <GameShell eyebrow="Jefe final · arts. 1765-1788 CC" titulo="Liquidación de la sociedad" volver={{ href: "/juego", etiqueta: "Volver al mapa" }}>
+      <div className="actividad">
+        <div className="visual actividad-visual" aria-hidden><Escenario lugar="archivo" /></div>
+        <section className="panel marco actividad-cuerpo" aria-label={f.titulo}>
+          <header className="actividad-cabecera">
+            <ol className="flex gap-1" aria-label={`Fase ${idx + 1} de ${FASES.length}`}>
+              {FASES.map((x, i) => (
+                <li
+                  key={x.id}
+                  className="flex-1 h-7 grid place-items-center rounded t-micro font-bold cifra"
+                  style={{ background: i === idx ? "var(--oro)" : i < idx ? "#2a3b2f" : "#1a1f2c", color: i === idx ? "#1b1408" : i < idx ? "var(--verde)" : "var(--texto-3)" }}
+                  aria-current={i === idx ? "step" : undefined}
+                  aria-label={`${x.titulo}${i < idx ? " (hecha)" : ""}`}
+                >
+                  {i < idx ? <Icono nombre="check" tam={12} grosor={3} /> : i + 1}
+                </li>
+              ))}
+            </ol>
+            <h2 className="t-titulo txt-oro">{f.titulo}</h2>
+          </header>
+          <div className="cuerpo">
+            <Paginado items={filas} clave={(x) => x.k} render={(x) => x.nodo} gap={6} etiqueta="Página" reinicio={f.id} />
+          </div>
+          <div className="barra-accion">
+            {idx > 0 && <button type="button" className="btn btn-secundario" onClick={() => irA(idx - 1)}><Icono nombre="flechaIzq" tam={18} /> Fase anterior</button>}
+            {f.id !== "cierre" ? (
+              <button type="button" className="btn btn-primario" onClick={() => irA(idx + 1)}>Avanzar a la siguiente fase <Icono nombre="flechaDer" tam={18} /></button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={`btn ${confirmarLoop ? "btn-peligro" : "btn-secundario"}`}
+                  onClick={() => { if (!confirmarLoop) { setConfirmarLoop(true); return; } game.iniciarSegundaVida(); router.push("/juego"); }}
+                >
+                  <Icono nombre="recuerdo" tam={18} /> {confirmarLoop ? "Confirmar segunda vida" : "Comenzar segunda vida (loop)"}
+                </button>
+                <button type="button" className="btn btn-primario" onClick={cerrar}>Cerrar y leer epílogo <Icono nombre="pergamino" tam={18} /></button>
+              </>
+            )}
+          </div>
+          {game.finalizado && f.id !== "cierre" && <Link href="/epilogo" className="t-meta txt-cian underline min-h-[44px] inline-flex items-center">Ya tienes un epílogo escrito: leerlo</Link>}
+        </section>
       </div>
-    </main>
+    </GameShell>
   );
-}
-
-function Inventario({ bienes }: { bienes: any[] }) {
-  const sociales = bienes.filter((b: any) => b.clase === "haber_absoluto" || b.clase === "haber_relativo");
-  const propios = bienes.filter((b: any) => b.clase.startsWith("propio"));
-  const reservados = bienes.filter((b: any) => b.clase === "reservado_art150" || b.clase === "satelite_art166" || b.clase === "satelite_art167");
-  const familiares = bienes.filter((b: any) => b.clase === "familiar");
-  return (
-    <div className="grid md:grid-cols-2 gap-3">
-      <Lista titulo="Bienes sociales" color="text-neon-blue" items={sociales} />
-      <Lista titulo="Bienes propios" color="text-neon-amber" items={propios} />
-      <Lista titulo="Patrimonio reservado y satélite" color="text-neon-cyan" items={reservados} />
-      <Lista titulo="Bienes familiares" color="text-neon-red" items={familiares} />
-    </div>
-  );
-}
-
-function Lista({ titulo, color, items }: { titulo: string; color: string; items: any[] }) {
-  return (
-    <div className="terminal p-4">
-      <div className={`label-art mb-2 ${color}`}>{titulo}</div>
-      {items.length === 0 && <p className="text-parchment/40 italic text-xs">—</p>}
-      {items.map((b: any) => (
-        <div key={b.id} className="text-xs border-b border-ink-400 py-1 flex justify-between">
-          <span>{b.nombre}</span><span className={color}>${b.valor.toLocaleString("es-CL")}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Tasacion({ total }: { total: number }) {
-  return (
-    <div className="terminal p-6">
-      <div className="label-art text-neon-cyan mb-2">Avalúo del haber social</div>
-      <p className="text-5xl text-neon-blue glitch-text">${total.toLocaleString("es-CL")}</p>
-      <p className="text-parchment/60 text-xs mt-3">Suma actualizada de bienes sociales (haber absoluto + relativo).</p>
-    </div>
-  );
-}
-
-function Deducciones({ bruto, bajas, liquido }: { bruto: number; bajas: number; liquido: number }) {
-  return (
-    <div className="terminal p-6">
-      <div className="label-art text-neon-cyan mb-2">Acervo líquido</div>
-      <div className="grid grid-cols-3 gap-3 text-center text-xs">
-        <div><div className="text-parchment/60">Bruto</div><div className="text-2xl text-neon-blue">${bruto.toLocaleString("es-CL")}</div></div>
-        <div><div className="text-parchment/60">– Bajas (art. 959)</div><div className="text-2xl text-neon-red">${bajas.toLocaleString("es-CL")}</div></div>
-        <div><div className="text-parchment/60">= Líquido</div><div className="text-2xl text-neon-cyan">${liquido.toLocaleString("es-CL")}</div></div>
-      </div>
-    </div>
-  );
-}
-
-function Recompensas({ recompensas }: { recompensas: any[] }) {
-  return (
-    <div className="terminal p-4">
-      <div className="label-art text-neon-violet mb-2">Libro de recompensas (arts. 1769-1779)</div>
-      {recompensas.length === 0 && <p className="text-parchment/40 italic text-xs">Sin recompensas pendientes.</p>}
-      {recompensas.map((r: any) => (
-        <div key={r.id} className="text-xs border-b border-ink-400 py-2">
-          <div className="flex justify-between"><span>{r.deudor} → {r.acreedor}</span><span className="text-neon-violet">${r.monto.toLocaleString("es-CL")}</span></div>
-          <div className="text-parchment/50">{r.motivo} {r.articulo && <span className="tag tag-violet ml-1">{r.articulo}</span>}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Gananciales({ valor }: { valor: number }) {
-  return (
-    <div className="terminal p-6 text-center">
-      <div className="label-art text-neon-cyan mb-2">Gananciales (art. 1773 CC)</div>
-      <p className="text-5xl text-neon-blue glitch-text">${valor.toLocaleString("es-CL")}</p>
-    </div>
-  );
-}
-
-function Particion({ gananciales, cuota }: { gananciales: number; cuota: number }) {
-  return (
-    <div className="terminal p-6">
-      <div className="label-art text-neon-cyan mb-2">División por mitades (art. 1774 CC)</div>
-      <div className="grid grid-cols-2 gap-4 text-center">
-        <div><div className="text-xs text-parchment/60">Gananciales</div><div className="text-3xl text-neon-blue">${gananciales.toLocaleString("es-CL")}</div></div>
-        <div><div className="text-xs text-parchment/60">Cuota por cónyuge</div><div className="text-3xl text-neon-violet">${cuota.toLocaleString("es-CL")}</div></div>
-      </div>
-    </div>
-  );
-}
-
-function Adjudicacion({ bienes }: { bienes: any[] }) {
-  return (
-    <div className="terminal p-4">
-      <div className="label-art text-neon-cyan mb-2">Hijuelas (art. 1337 CC)</div>
-      <p className="text-parchment/60 text-xs mb-3">Asignación concreta. Se busca equidad y comodidad de la división.</p>
-      <div className="grid grid-cols-2 gap-3 text-xs">
-        <div>
-          <div className="text-neon-blue mb-1">Hijuela A</div>
-          {bienes.filter((_: any, i: number) => i % 2 === 0).map((b: any) => <div key={b.id} className="border-b border-ink-400 py-1">{b.nombre}</div>)}
-        </div>
-        <div>
-          <div className="text-neon-blue mb-1">Hijuela B</div>
-          {bienes.filter((_: any, i: number) => i % 2 === 1).map((b: any) => <div key={b.id} className="border-b border-ink-400 py-1">{b.nombre}</div>)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InscripcionConservatoria() {
-  return (
-    <div className="terminal p-6">
-      <div className="label-art text-neon-cyan mb-2">Inscripción en el Conservador de Bienes Raíces</div>
-      <p className="text-parchment/70 text-sm">
-        Las adjudicaciones de inmuebles deben inscribirse en el CBR competente para que produzcan tradición y sean
-        oponibles a terceros (arts. 686, 687 CC y Reglamento del CBR). Sin inscripción, el adjudicatario es solo
-        un titular obligacional, no dueño frente a terceros.
-      </p>
-    </div>
-  );
-}
-
-function generarEpilogo(game: any, calc: any) {
-  const p = game.personaje;
-  const cuota = calc.cuotaPorConyuge;
-  const hijosTrauma = game.hijos.reduce((s: number, h: any) => s + h.trauma, 0);
-  const moroso = game.hijos.some((h: any) => !h.alimentosAlDia);
-  const fraude = game.flags.includes("fraude_simulacion");
-  const vif = game.flags.includes("denuncia_vif");
-  const bigamia = game.flags.includes("bigamia_oculta");
-  const ceFalsa = game.flags.includes("cese_falso");
-  const incumpl = (game.incumplimientos || []).filter((i: any) => i.habilitaCulpa).length;
-
-  const tono = p.trauma > 70 ? "ruinoso" : p.reputacion > 30 ? "ejemplar" : "gris";
-
-  const lineas: string[] = [];
-  lineas.push(`${p.nombre}, ${p.profesion} de origen ${p.origen}, completó el ciclo vital N°${p.cicloVital} el ${new Date().toLocaleDateString("es-CL")}.`);
-  lineas.push(`Estado civil definitivo del ciclo: ${p.estadoCivil}. Régimen: ${p.regimen?.replace(/_/g, " ") ?? "ninguno"}.`);
-  lineas.push(`Tras la partición, le correspondió una cuota de gananciales de aproximadamente $${cuota.toLocaleString("es-CL")}.`);
-  if (incumpl > 0) lineas.push(`Acumuló ${incumpl} incumplimientos graves de deberes recíprocos (art. 131 ss. CC). Esto pudo bloquear su compensación económica (art. 62 inc. 2° LMC).`);
-  if (game.recompensas?.length) lineas.push(`Acumuló ${game.recompensas.length} asientos en el libro de recompensas (arts. 1769-1779).`);
-  if (moroso) lineas.push(`Murió esperando inscripción conservatoria mientras evadía un apremio personal por alimentos impagos (Ley 14.908 y Ley 21.389).`);
-  if (fraude) lineas.push(`Se rumorea que simuló una enajenación: la nulidad relativa pende sobre su tumba (art. 1682 CC).`);
-  if (bigamia) lineas.push(`Su primer matrimonio nunca fue disuelto; el segundo fue declarado nulo, pero los hijos conservaron la calidad de matrimoniales por buena fe (art. 51 LMC).`);
-  if (vif) lineas.push(`La VIF dejó marcas que la jurisprudencia llamó "daño moral indemnizable" (Ley 20.066).`);
-  if (ceFalsa) lineas.push(`Falseó la fecha del cese: la contraparte impugnó. Lo demás fue silencio procesal.`);
-  if (hijosTrauma > 40) lineas.push(`Sus hijos crecieron tomando notas de cada incumplimiento. Recordarán todo.`);
-  if (game.ce?.acordada) lineas.push(`Su compensación económica final fue de $${game.ce.montoEstimado.toLocaleString("es-CL")} en modalidad ${game.ce.modalidad}.`);
-  lineas.push(tono === "ruinoso"
-    ? "Su epitafio: «Aquí yace un haber relativo sin recompensar»."
-    : tono === "ejemplar"
-      ? "Su epitafio: «Cumplió los arts. 131 y 102 hasta el final»."
-      : "Su epitafio: «Un patrimonio razonable. Un afecto razonable. Nada del otro mundo civil».");
-
-  return lineas.join("\n\n");
 }
