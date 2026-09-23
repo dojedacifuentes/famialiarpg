@@ -1,136 +1,251 @@
 "use client";
+// ============================================================================
+// MAPA DE LA CAMPAÑA — cuatro actos, quince capítulos.
+// Cada destino muestra su estado con icono y texto (no sólo color): bloqueado,
+// disponible, en curso (con progreso) o completado. El "siguiente objetivo"
+// guía al jugador; la ficha del destino explica qué se juega y qué falta.
+// ============================================================================
 import Link from "next/link";
-import { useGame } from "@/store/useGame";
-import { motion } from "framer-motion";
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { Mundo } from "@/types/game";
+import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { useGame, useMontado } from "@/store/useGame";
+import {
+  ACTOS, CAPITULOS, estadoCapitulo, progresoCapitulo, siguienteCapitulo, TEXTO_REQUISITO,
+  type Capitulo, type EstadoCapitulo,
+} from "@/data/capitulos";
+import { NOMBRE_ESTADO_CIVIL, NOMBRE_LUGAR, NOMBRE_REGIMEN } from "@/data/escenario";
+import GameShell from "@/components/ui/GameShell";
+import Icono from "@/components/ui/Icono";
+import { Paginado, useTamano } from "@/components/ui/Ajuste";
+import { Progreso } from "@/components/ui/Actividad";
+import { PlanoCiudad } from "@/components/arte/Escenario";
 
-const MAPA: { id: Mundo; titulo: string; subt: string; req?: string }[] = [
-  { id: "noviazgo", titulo: "I · El Noviazgo Precontractual", subt: "Esponsales, impedimentos, vicios del consentimiento (arts. 98, 5-8 LMC)." },
-  { id: "matrimonio", titulo: "II · El Matrimonio", subt: "Capitulaciones y régimen (arts. 135, 1715-1721 CC).", req: "consentimiento" },
-  { id: "haber", titulo: "III · El Haber social", subt: "Clasificación: art. 1725. Recompensas y subrogación.", req: "casado" },
-  { id: "patrimonios_satelite", titulo: "III bis · Patrimonios satélite", subt: "Arts. 150, 166, 167 — mujer casada en SC.", req: "casada_mujer_sc" },
-  { id: "deberes", titulo: "IV · Deberes recíprocos", subt: "Fidelidad, socorro, ayuda, respeto (arts. 131-134 CC).", req: "casado" },
-  { id: "hijos", titulo: "V · Filiación y cuidado", subt: "Filiación, alimentos, cuidado personal, RDR (Leyes 19.585, 14.908).", req: "casado" },
-  { id: "filiacion_acciones", titulo: "V bis · Acciones de filiación", subt: "Reclamación, impugnación, prueba biológica (arts. 195-221).", req: "casado" },
-  { id: "bienes_familiares", titulo: "VI · Bienes familiares", subt: "Arts. 141-149 CC. Declaración, efectos, desafectación.", req: "casado" },
-  { id: "crisis", titulo: "VII · Crisis matrimonial", subt: "Infidelidad, VIF, simulación. Causales del art. 54 LMC.", req: "casado" },
-  { id: "cese_convivencia", titulo: "VIII · Fecha cierta del cese", subt: "Arts. 22 y 25 LMC: medios taxativos.", req: "ruptura" },
-  { id: "acuerdo_regulador", titulo: "IX · Acuerdo regulador", subt: "Arts. 21 y 27 LMC: completo y suficiente.", req: "ruptura" },
-  { id: "separacion", titulo: "X · Separación y divorcio", subt: "Vías del art. 54-55 LMC; separación judicial 26-29." },
-  { id: "compensacion_economica", titulo: "XI · Compensación económica", subt: "Arts. 61-66 LMC. Cálculo y modalidades.", req: "ruptura" },
-  { id: "nulidad", titulo: "XII · Nulidad y matrimonio putativo", subt: "Arts. 5-8, 17, 51 LMC.", req: "casado" },
-  { id: "liquidacion", titulo: "XIII · Liquidación", subt: "Boss final patrimonial (arts. 1765-1788 CC).", req: "ruptura" },
-  { id: "segunda_vida", titulo: "XIV · Segunda vida", subt: "Post-divorcio. Rehacer patrimonio, segundas nupcias (arts. 124-127).", req: "post_ruptura" },
-  { id: "examen", titulo: "XV · Modo Examen", subt: "Cédula de 30 preguntas con explicación normativa." },
-];
+const ETIQUETA: Record<EstadoCapitulo, string> = {
+  bloqueado: "Bloqueado",
+  disponible: "Disponible",
+  en_curso: "En curso",
+  completado: "Completado",
+};
 
-export default function Juego() {
-  const router = useRouter();
-  const { personaje, flags, hijos, bienes, log, recompensas, conyuge, finalizado, ce, fechaCierta } = useGame();
-
-  useEffect(() => {
-    if (!personaje.nombre) router.replace("/creacion");
-  }, [personaje.nombre, router]);
-
-  if (!personaje.nombre) return null;
-
-  const casado = personaje.estadoCivil === "casado" || personaje.estadoCivil === "casado_segundo";
-  const ruptura = flags.includes("ruptura_definitiva") || ["separado_judicial", "divorciado", "nulidad"].includes(personaje.estadoCivil);
-  const postRuptura = ruptura;
-  const consentValido = flags.includes("consentimiento_valido") || casado;
-  const esMujerSC = personaje.sexo === "femenino" && personaje.regimen === "sociedad_conyugal";
-
-  function puede(req?: string) {
-    if (!req) return true;
-    if (req === "consentimiento") return consentValido;
-    if (req === "casado") return casado;
-    if (req === "casada_mujer_sc") return esMujerSC && casado;
-    if (req === "ruptura") return ruptura || casado; // se exploran al avanzar la crisis
-    if (req === "post_ruptura") return postRuptura;
-    return true;
-  }
-
+function Emblema({ cap, estado, tam = 52, recomendado }: { cap: Capitulo; estado: EstadoCapitulo; tam?: number; recomendado?: boolean }) {
+  const color = estado === "completado" ? "var(--verde)" : estado === "bloqueado" ? "#6b7288" : "var(--oro)";
   return (
-    <main className="min-h-screen px-6 py-8 max-w-6xl mx-auto">
-      <header className="flex justify-between items-start mb-6 flex-wrap gap-3">
-        <div>
-          <div className="tag mb-2">EXPEDIENTE ABIERTO · CICLO {personaje.cicloVital}</div>
-          <h1 className="label-art text-2xl text-neon-blue">{personaje.nombre}</h1>
-          <p className="text-parchment/60 text-xs uppercase tracking-widest">
-            {personaje.sexo} · {personaje.profesion} · {personaje.origen} · est. civil: {personaje.estadoCivil}
-            {personaje.regimen ? ` · ${personaje.regimen.replace(/_/g, " ")}` : ""}
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Link href="/codex" className="btn">📜 Codex</Link>
-          <Link href="/inventario" className="btn">📦 Inventario</Link>
-          {finalizado && <Link href="/epilogo" className="btn">📜 Epílogo</Link>}
-          <Link href="/" className="btn btn-danger">⏻ Salir</Link>
-        </div>
-      </header>
-
-      <section className="grid lg:grid-cols-3 gap-4 mb-6">
-        <Stat label="Reputación" value={personaje.reputacion} min={-100} max={100} color="violet" />
-        <Stat label="Trauma" value={personaje.trauma} min={0} max={100} color="red" />
-        <Stat label="Nivel económico" value={personaje.nivelEconomico} min={0} max={100} color="blue" />
-      </section>
-
-      <section className="grid md:grid-cols-2 gap-4 mb-8">
-        {MAPA.map((m) => {
-          const habilitado = puede(m.req);
-          return (
-            <motion.div key={m.id} whileHover={{ y: -2 }}>
-              <Link
-                href={habilitado ? `/mundo/${m.id}` : "#"}
-                className={`block terminal p-5 ${!habilitado ? "opacity-40 pointer-events-none" : ""}`}
-              >
-                <div className="label-art text-neon-cyan text-lg">{m.titulo}</div>
-                <div className="text-parchment/60 text-xs mt-1">{m.subt}</div>
-                {!habilitado && <div className="tag tag-amber mt-3">BLOQUEADO</div>}
-              </Link>
-            </motion.div>
-          );
-        })}
-      </section>
-
-      <section className="terminal p-4 mb-8">
-        <div className="label-art text-neon-violet text-sm mb-2">Registro del expediente</div>
-        <div className="max-h-40 overflow-y-auto text-xs text-parchment/70 space-y-1">
-          {log.length === 0 && <div className="italic text-parchment/40">Sin actuaciones. Pronto la lluvia jurídica caerá.</div>}
-          {log.map((l, i) => (
-            <div key={i}>
-              <span className="text-neon-blue">›</span> {l.texto}
-              {l.tag && <span className="ml-2 tag">{l.tag}</span>}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid md:grid-cols-4 gap-3 text-xs">
-        <div className="terminal p-3"><b className="text-neon-cyan">{bienes.length}</b> bienes</div>
-        <div className="terminal p-3"><b className="text-neon-cyan">{hijos.length}</b> hijos · {hijos.filter(h=>!h.alimentosAlDia).length} en mora</div>
-        <div className="terminal p-3"><b className="text-neon-cyan">{recompensas.length}</b> recompensas</div>
-        <div className="terminal p-3">
-          {fechaCierta ? <b className="text-neon-blue">Cese: {fechaCierta.medio.replace(/_/g, " ")}</b> : <span className="text-parchment/40">Cese pendiente</span>}
-        </div>
-      </section>
-    </main>
+    <span
+      className="relative grid place-items-center rounded-full shrink-0"
+      style={{
+        width: tam, height: tam,
+        background: estado === "bloqueado" ? "#11141c" : "radial-gradient(circle at 35% 30%, #2a2416, #12110d)",
+        border: `2px ${estado === "bloqueado" ? "dashed" : "solid"} ${color}`,
+        boxShadow: recomendado ? "0 0 0 4px rgba(224,178,92,.18), 0 0 22px rgba(224,178,92,.35)" : undefined,
+        color,
+      }}
+      aria-hidden
+    >
+      <Icono nombre={estado === "bloqueado" ? "candado" : cap.icono} tam={Math.round(tam * 0.46)} />
+      {estado === "completado" && (
+        <span className="absolute -right-1 -bottom-1 grid place-items-center w-5 h-5 rounded-full" style={{ background: "var(--verde)", color: "#0b0d14" }}>
+          <Icono nombre="check" tam={13} grosor={3} />
+        </span>
+      )}
+    </span>
   );
 }
 
-function Stat({ label, value, min, max, color }: { label: string; value: number; min: number; max: number; color: "violet" | "red" | "blue" }) {
-  const pct = ((value - min) / (max - min)) * 100;
-  const c = color === "violet" ? "bg-neon-violet" : color === "red" ? "bg-neon-red" : "bg-neon-blue";
+export default function Juego() {
+  const montado = useMontado();
+  const router = useRouter();
+  const game = useGame();
+  const { personaje, finalizado, log } = game;
+  const sig = siguienteCapitulo(game);
+  const [acto, setActo] = useState<number | null>(null);
+  const [sel, setSel] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (montado && !personaje.nombre) router.replace("/creacion");
+  }, [montado, personaje.nombre, router]);
+
+  const actoVisible = acto ?? sig?.acto ?? 1;
+  const caps = useMemo(() => CAPITULOS.filter((c) => c.acto === actoVisible), [actoVisible]);
+  const seleccionado = CAPITULOS.find((c) => c.id === sel) ?? (sig && sig.acto === actoVisible ? sig : caps[0]);
+
+  if (!montado || !personaje.nombre) {
+    return <GameShell titulo="Mapa del expediente" stats={false}><div /></GameShell>;
+  }
+
+  const completados = CAPITULOS.filter((c) => estadoCapitulo(c, game) === "completado").length;
+  const actoInfo = ACTOS.find((a) => a.n === actoVisible)!;
+  const completosActo = caps.filter((c) => estadoCapitulo(c, game) === "completado").length;
+  const estadoSel = estadoCapitulo(seleccionado, game);
+  const progSel = progresoCapitulo(seleccionado.id, game);
+
+  const cambiarActo = (d: number) => {
+    const n = Math.max(1, Math.min(ACTOS.length, actoVisible + d));
+    setActo(n);
+    const primero = CAPITULOS.find((c) => c.acto === n && (estadoCapitulo(c, game) === "disponible" || estadoCapitulo(c, game) === "en_curso")) ?? CAPITULOS.find((c) => c.acto === n);
+    setSel(primero?.id ?? null);
+  };
+
+  const ficha = (
+    <section className="panel marco p-3 flex flex-col gap-2 mapa-ficha" aria-label={`Destino: ${seleccionado.titulo}`} aria-live="polite">
+      <div className="flex items-center gap-3">
+        <Emblema cap={seleccionado} estado={estadoSel} tam={44} />
+        <div className="min-w-0 flex-1">
+          <div className="rotulo txt-oro">Cap. {seleccionado.numeral} · {NOMBRE_LUGAR[seleccionado.lugar]}</div>
+          <h2 className="font-display font-bold txt-1 leading-tight">{seleccionado.titulo}</h2>
+        </div>
+        <span className="insignia" data-tono={estadoSel === "completado" ? "verde" : estadoSel === "bloqueado" ? undefined : "oro"}>{ETIQUETA[estadoSel]}</span>
+      </div>
+      <p className="t-meta txt-2">{seleccionado.subt}</p>
+      {estadoSel === "bloqueado" ? (
+        <p className="t-meta txt-2 flex gap-1.5"><Icono nombre="candado" tam={16} className="mt-0.5" /> {seleccionado.req ? TEXTO_REQUISITO[seleccionado.req] : ""}</p>
+      ) : (
+        <>
+          <p className="t-meta txt-1 flex gap-1.5"><Icono nombre="bandera" tam={16} className="mt-0.5 txt-oro" /> {seleccionado.objetivo}</p>
+          {progSel.hecho > 0 && <Progreso hecho={progSel.hecho} total={progSel.total} />}
+        </>
+      )}
+      <div className="barra-accion !pt-1">
+        {estadoSel === "bloqueado" ? (
+          <button type="button" className="btn btn-secundario" disabled>
+            <Icono nombre="candado" tam={18} /> Bloqueado
+          </button>
+        ) : (
+          <Link href={`/mundo/${seleccionado.id}`} className="btn btn-primario">
+            {estadoSel === "completado" ? "Revisar" : estadoSel === "en_curso" ? "Continuar" : "Entrar"} <Icono nombre="flechaDer" tam={18} />
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+
   return (
-    <div className="terminal p-4">
-      <div className="flex justify-between text-xs uppercase tracking-widest mb-2">
-        <span>{label}</span><span className="text-parchment/70">{value}</span>
+    <GameShell
+      eyebrow={`Ciclo ${personaje.cicloVital} · ${completados}/${CAPITULOS.length} capítulos`}
+      titulo={personaje.nombre}
+      acciones={finalizado ? <Link href="/epilogo" className="btn btn-secundario" title="Leer epílogo"><Icono nombre="pergamino" tam={18} /><span className="hidden sm:inline">Epílogo</span></Link> : undefined}
+    >
+      <div className="mapa">
+        <div className="mapa-tablero panel">
+          <div className="mapa-acto">
+            <button type="button" className="btn btn-secundario btn-icono" onClick={() => cambiarActo(-1)} disabled={actoVisible === 1} aria-label="Acto anterior">
+              <Icono nombre="flechaIzq" tam={20} />
+            </button>
+            <div className="min-w-0 flex-1 text-center">
+              <h2 className="font-display font-bold txt-oro leading-tight">{actoInfo.titulo}</h2>
+              <p className="t-meta txt-2">{completosActo}/{caps.length} completados<span className="hidden sm:inline"> · {actoInfo.lema}</span></p>
+            </div>
+            <button type="button" className="btn btn-secundario btn-icono" onClick={() => cambiarActo(1)} disabled={actoVisible === ACTOS.length} aria-label="Acto siguiente">
+              <Icono nombre="flechaDer" tam={20} />
+            </button>
+          </div>
+          <Ruta caps={caps} seleccion={seleccionado.id} recomendado={sig?.id} onSel={setSel} acto={actoVisible} />
+
+        </div>
+        <div className="mapa-lateral">
+          {ficha}
+          <div className="panel p-3 mapa-estado">
+            <div className="rotulo mb-1">Tu situación</div>
+            <p className="t-meta txt-2">
+              {NOMBRE_ESTADO_CIVIL[personaje.estadoCivil] ?? personaje.estadoCivil}
+              {personaje.regimen ? ` · ${NOMBRE_REGIMEN[personaje.regimen]}` : ""} · {game.bienes.length} bienes · {game.hijos.length} hijos
+            </p>
+          </div>
+          <div className="panel p-3 mapa-estado flex-1 min-h-0 flex flex-col">
+            <div className="rotulo mb-1">Registro reciente</div>
+            <Paginado
+              items={log.slice(0, 12)}
+              clave={(l, i) => `${l.t}-${i}`}
+              etiqueta="Registro"
+              gap={4}
+              render={(l) => (
+                <p className="t-meta txt-2 border-l-2 border-oro/40 pl-2">{l.texto}</p>
+              )}
+            />
+            {log.length === 0 && <p className="t-meta txt-3">Sin actuaciones. Pronto la lluvia jurídica caerá.</p>}
+          </div>
+        </div>
       </div>
-      <div className="h-2 bg-ink-700">
-        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} className={`h-full ${c}`} />
-      </div>
+    </GameShell>
+  );
+}
+
+/** Ruta del acto: camino sinuoso sobre la ciudad en pantallas amplias; lista vertical paginada en teléfonos. */
+function Ruta({ caps, seleccion, recomendado, onSel, acto }: { caps: Capitulo[]; seleccion: string; recomendado?: string; onSel: (id: string) => void; acto: number }) {
+  const game = useGame();
+  const [ref, tam] = useTamano<HTMLDivElement>();
+  const amplio = tam.w >= 640 && tam.h >= 300;
+
+  // Puntos del camino (en %), en zigzag de izquierda a derecha.
+  const puntos = caps.map((_, i) => {
+    const n = caps.length;
+    const x = n === 1 ? 50 : 12 + (76 * i) / (n - 1);
+    const y = i % 2 === 0 ? 34 : 70;
+    return { x, y };
+  });
+
+  return (
+    <div ref={ref} className="relative flex-1 min-h-0 flex flex-col">
+      {amplio ? (
+        <div className="absolute inset-0 overflow-hidden rounded-b-[10px]">
+          <div className="absolute inset-0" aria-hidden>
+            <PlanoCiudad />
+          </div>
+          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+            <polyline points={puntos.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#e0b25c" strokeOpacity="0.55" strokeWidth="0.6" strokeDasharray="1.5 1.2" vectorEffect="non-scaling-stroke" style={{ strokeWidth: 3 }} />
+          </svg>
+          <ol className="absolute inset-0" aria-label={`Capítulos del acto ${acto}`}>
+            {caps.map((c, i) => {
+              const est = estadoCapitulo(c, game);
+              const pr = progresoCapitulo(c.id, game);
+              return (
+                <li key={c.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${puntos[i].x}%`, top: `${puntos[i].y}%` }}>
+                  <motion.button
+                    type="button"
+                    whileHover={{ y: -3 }}
+                    onClick={() => onSel(c.id)}
+                    aria-pressed={seleccion === c.id}
+                    className={`flex flex-col items-center gap-1 w-[9.5rem] p-1.5 rounded-lg text-center ${seleccion === c.id ? "bg-[rgba(224,178,92,.12)] outline outline-2 outline-[var(--oro)]" : ""}`}
+                  >
+                    <Emblema cap={c} estado={est} recomendado={recomendado === c.id} />
+                    <span className="t-meta font-bold txt-1 leading-tight rounded px-1" style={{ background: "rgba(11,13,20,.85)" }}>{c.numeral} · {c.titulo}</span>
+                    <span className="t-micro txt-2 rounded px-1" style={{ background: "rgba(11,13,20,.85)" }}>
+                      {ETIQUETA[est]}{est === "en_curso" ? ` ${pr.hecho}/${pr.total}` : ""}
+                      {recomendado === c.id ? " · Siguiente" : ""}
+                    </span>
+                  </motion.button>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 flex flex-col px-2 pb-1">
+          <Paginado
+            items={caps}
+            clave={(c) => c.id}
+            etiqueta="Capítulos"
+            gap={6}
+            reinicio={acto}
+            render={(c) => {
+              const est = estadoCapitulo(c, game);
+              const pr = progresoCapitulo(c.id, game);
+              return (
+                <button type="button" onClick={() => onSel(c.id)} aria-pressed={seleccion === c.id} className="eleccion !flex-row !items-center gap-3">
+                  <Emblema cap={c} estado={est} tam={44} recomendado={recomendado === c.id} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-bold txt-1 leading-tight">{c.numeral} · {c.titulo}</span>
+                    <span className="block t-meta txt-2">
+                      {ETIQUETA[est]}{est === "en_curso" ? ` · ${pr.hecho}/${pr.total}` : ""}
+                      {recomendado === c.id && <span className="txt-oro"> · Siguiente objetivo</span>}
+                    </span>
+                  </span>
+                </button>
+              );
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

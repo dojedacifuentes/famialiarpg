@@ -1,8 +1,59 @@
-# EXPEDIENTE 1725/2026 — Derecho de Familia RPG · v2.0
+# EXPEDIENTE 1725/2026 — Derecho de Familia RPG · v3.0
 
 **Disco Elysium + Código Civil chileno.** RPG narrativo web sobre matrimonio, sociedad conyugal, patrimonios satélites de la mujer casada, deberes recíprocos, filiación, divorcio, nulidad, compensación económica, liquidación y reconstrucción post-divorcio. Pensado para **estudio del examen de grado**.
 
-Estética: minimalismo cyberpunk-notarial, CRT, glitch jurídico, neon azul/violeta sobre negro.
+Estética (v3): **noir notarial** — Santiago de noche, lluvia, luz de sodio sobre expedientes. Escenarios y retratos vectoriales propios, superficies de lectura opacas.
+
+---
+
+## Qué cambió en v3 (rediseño RPG)
+
+### Una escena por pantalla
+- Armazón común (`components/ui/GameShell.tsx`): HUD compacto · escena · navegación. Mide exactamente
+  la ventana (`100dvh` con respaldo `100vh`), respeta *safe areas* y el teclado virtual
+  (`interactive-widget=resizes-content`). El documento no se desplaza nunca.
+- **Paginación por medición** (`components/ui/Ajuste.tsx`, lógica pura en `lib/paginar.ts`): diálogos,
+  opciones, casos, bienes, códex y resultados se reparten en páginas según el alto real disponible.
+  Nada se recorta ni se achica la letra; con texto ampliado, la región desborda de forma controlada.
+- Formularios convertidos en pasos (creación en 5 pasos, compensación económica en 4).
+- En pantallas anchas: escenario arriba y caja de diálogo abajo (clásico RPG); mapa con camino sobre
+  el plano de la ciudad; paneles con escenario lateral.
+
+### Tipografía: exactamente dos familias
+- **Cinzel** (títulos, capítulos, nombres) y **Atkinson Hyperlegible** (todo lo demás), vía `next/font`.
+- Escala central en `app/globals.css` (`--t-micro` 13 px … `--t-display`), cuerpo de 16 px o más.
+  Botones de 44 × 44 px mínimo, foco visible, estados con icono y texto (no sólo color).
+
+### Ciclo de juego
+situación → diálogo → decisión → **consecuencia** (qué pasó en la historia · qué cambió · regla jurídica,
+con enlace al códex) → nueva posibilidad.
+- **Mapa por actos** con estado de cada capítulo (bloqueado, disponible, en curso, completado),
+  progreso y "siguiente objetivo". Objetivo visible en cada capítulo y en su bitácora.
+- **Recompensas una sola vez**: escenas, casos y acciones se registran en el guardado; volver,
+  recargar o pulsar dos veces no duplica efectos.
+- **Aprender del error**: los casos fallados del haber vuelven en una segunda revisión; el examen
+  permite repasar los errores; cualquier escena decidida se puede **revivir en modo recuerdo**
+  (sin efectos) para ver qué habría pasado con otra decisión.
+- **Recompensas por comprensión**: +1 Inteligencia jurídica sólo al acertar al primer intento y sin
+  pista (la inteligencia desbloquea opciones de diálogo); logros "Intuición notarial" y
+  "Acuerdo completo y suficiente".
+- **Antecedentes con función**: la prueba, la fecha cierta o el acuerdo regulador se presentan como
+  objetos ante el tribunal; si la demanda se rechaza, la sentencia dice qué faltó y dónde conseguirlo.
+- Los personajes reaccionan (cambia su expresión) según lo que provocó tu decisión.
+
+### Guardado
+- Versión 4 con **migración segura** desde v3 (antes, un cambio de versión borraba la partida). Ver
+  `lib/partida.ts`.
+
+### Verificación
+```bash
+npm test          # vitest: paginación, migración, idempotencia, reglas del clasificador
+npm run typecheck # tsc --noEmit
+npm run lint
+npm run build
+```
+
+Las dudas jurídicas detectadas (sin modificar el contenido) están en [`docs/REVISION_JURIDICA.md`](docs/REVISION_JURIDICA.md).
 
 ---
 

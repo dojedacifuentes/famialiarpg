@@ -1,78 +1,129 @@
 "use client";
+// Acuerdo regulador completo y suficiente (arts. 21 y 27 LMC).
+// Redactar → presentar → sentencia sobre el acuerdo → corregir si falta algo.
+import { useState } from "react";
+import Link from "next/link";
 import { useGame } from "@/store/useGame";
 import { evaluarAcuerdoRegulador } from "@/lib/reglas";
-import { useState } from "react";
 import type { AcuerdoRegulador } from "@/types/game";
+import { capitulo, progresoCapitulo } from "@/data/capitulos";
+import Actividad from "@/components/ui/Actividad";
+import Consecuencia from "@/components/ui/Consecuencia";
+import { Paginado } from "@/components/ui/Ajuste";
+import Icono from "@/components/ui/Icono";
+
+const ITEMS: { k: keyof AcuerdoRegulador; label: string; art: string }[] = [
+  { k: "alimentosHijos", label: "Alimentos para hijos comunes", art: "Ley 14.908 / Art. 21 LMC" },
+  { k: "cuidadoPersonal", label: "Cuidado personal de los hijos", art: "Arts. 225, 27 LMC" },
+  { k: "relacionDirectaRegular", label: "Relación directa y regular", art: "Art. 229 CC" },
+  { k: "alimentosConyuge", label: "Alimentos entre cónyuges (si procede)", art: "Arts. 321, 134 CC" },
+  { k: "bienesFamiliares", label: "Destino de bienes familiares", art: "Arts. 141-149 CC" },
+  { k: "liquidacionRegimen", label: "Liquidación o renuncia del régimen", art: "Arts. 1765 ss. / 1792-3 ss. CC" },
+  { k: "compensacionEconomica", label: "Compensación económica", art: "Arts. 61-66 LMC" },
+];
+
+const REGLA = {
+  titulo: "Acuerdo regulador (arts. 21 y 27 LMC)",
+  parrafos: [
+    "Para el divorcio de común acuerdo (art. 55 inc. 1° LMC), los cónyuges deben acompañar un acuerdo que regule sus relaciones mutuas y respecto de los hijos comunes.",
+    "El acuerdo será COMPLETO si cubre todas las materias del art. 21 y SUFICIENTE si resguarda el interés superior de los hijos, procura aminorar el menoscabo económico y establece relaciones equitativas entre los cónyuges.",
+  ],
+  articulo: "Arts. 21 y 27 LMC",
+};
+
+const VACIO: AcuerdoRegulador = {
+  alimentosHijos: false, cuidadoPersonal: false, relacionDirectaRegular: false,
+  alimentosConyuge: false, bienesFamiliares: false, liquidacionRegimen: false,
+  compensacionEconomica: false, completo: false, suficiente: false,
+};
 
 export default function AcuerdoReguladorPanel() {
-  const { hijos, conyuge, setConyuge, pushLog } = useGame();
-  const [a, setA] = useState<AcuerdoRegulador>({
-    alimentosHijos: false, cuidadoPersonal: false, relacionDirectaRegular: false,
-    alimentosConyuge: false, bienesFamiliares: false, liquidacionRegimen: false,
-    compensacionEconomica: false, completo: false, suficiente: false,
-  });
-  const [eval_, setEval] = useState<ReturnType<typeof evaluarAcuerdoRegulador> | null>(null);
+  const game = useGame();
+  const { hijos, conyuge } = game;
+  const [a, setA] = useState<AcuerdoRegulador>(conyuge?.acuerdoRegulador ?? VACIO);
+  const [evaluacion, setEvaluacion] = useState<ReturnType<typeof evaluarAcuerdoRegulador> | null>(null);
+  const cap = capitulo("acuerdo_regulador")!;
+  const progreso = progresoCapitulo("acuerdo_regulador", game);
+  const aprobado = !!(conyuge?.acuerdoRegulador?.completo && conyuge.acuerdoRegulador.suficiente);
 
-  function toggle<K extends keyof AcuerdoRegulador>(k: K) {
+  function toggle(k: keyof AcuerdoRegulador) {
     setA((prev) => ({ ...prev, [k]: !prev[k] }));
   }
 
   function evaluar() {
     const r = evaluarAcuerdoRegulador(a, hijos.length > 0);
-    setEval(r);
-    if (r.completo && r.suficiente && conyuge) {
-      setConyuge({ ...conyuge, acuerdoRegulador: { ...a, completo: true, suficiente: true } });
-      pushLog("Acuerdo regulador completo y suficiente. Habilita art. 55 inc. 1 LMC.", r.articulo);
+    setEvaluacion(r);
+    const st = useGame.getState();
+    if (r.completo && r.suficiente && st.conyuge) {
+      const yaEstaba = st.conyuge.acuerdoRegulador?.completo && st.conyuge.acuerdoRegulador.suficiente;
+      st.setConyuge({ ...st.conyuge, acuerdoRegulador: { ...a, completo: true, suficiente: true } });
+      if (!yaEstaba) {
+        st.pushLog("Acuerdo regulador completo y suficiente. Habilita art. 55 inc. 1 LMC.", r.articulo);
+        st.desbloquearLogro({ id: "acuerdo_regulador", titulo: "Acuerdo completo y suficiente", descripcion: "Redactaste un acuerdo regulador aprobado.", articulo: "Arts. 21 y 27 LMC", desbloqueado: true });
+      }
     }
   }
 
-  const ITEMS: { k: keyof AcuerdoRegulador; label: string; art: string }[] = [
-    { k: "alimentosHijos", label: "Alimentos para hijos comunes", art: "Ley 14.908 / Art. 21 LMC" },
-    { k: "cuidadoPersonal", label: "Cuidado personal de los hijos", art: "Arts. 225, 27 LMC" },
-    { k: "relacionDirectaRegular", label: "Relación directa y regular", art: "Art. 229 CC" },
-    { k: "alimentosConyuge", label: "Alimentos entre cónyuges (si procede)", art: "Arts. 321, 134 CC" },
-    { k: "bienesFamiliares", label: "Destino de bienes familiares", art: "Arts. 141-149 CC" },
-    { k: "liquidacionRegimen", label: "Liquidación o renuncia del régimen", art: "Arts. 1765 ss. / 1792-3 ss. CC" },
-    { k: "compensacionEconomica", label: "Compensación económica", art: "Arts. 61-66 LMC" },
-  ];
+  if (!conyuge) {
+    return (
+      <Actividad titulo="Acuerdo regulador" objetivo={cap.objetivo} regla={REGLA} lugar="despacho">
+        <div className="cuerpo"><p className="tarjeta t-lectura txt-2">No hay cónyuge registrado en este ciclo: el acuerdo presupone un matrimonio.</p></div>
+      </Actividad>
+    );
+  }
+
+  if (evaluacion) {
+    const ok = evaluacion.completo && evaluacion.suficiente;
+    return (
+      <Actividad titulo="Sentencia sobre el acuerdo" objetivo={cap.objetivo} progreso={progreso} regla={REGLA} lugar="tribunal" retrato="jueza" animo={ok ? "aprueba" : "molesto"}>
+        <div className="cuerpo">
+          <Consecuencia
+            tono={ok ? "exito" : "fallo"}
+            titulo={ok ? "✓ Acuerdo completo y suficiente" : "✗ Acuerdo insuficiente"}
+            narrativa={
+              evaluacion.observaciones.length > 0 ? (
+                <ul className="space-y-1">{evaluacion.observaciones.map((o, i) => <li key={i}>• {o}</li>)}</ul>
+              ) : "Sin observaciones."
+            }
+            deltas={ok ? [{ texto: "Antecedente: acuerdo regulador aprobado", signo: "•", tono: "cian" }] : [{ texto: "Corrige las cláusulas y vuelve a presentarlo", signo: "•", tono: "oro" }]}
+            regla={{ articulo: evaluacion.articulo, texto: "COMPLETO si cubre todas las materias del art. 21; SUFICIENTE si resguarda el interés superior de los hijos, procura aminorar el menoscabo económico y establece relaciones equitativas entre los cónyuges.", codex: "27" }}
+          />
+        </div>
+        <div className="barra-accion">
+          <button type="button" className="btn btn-secundario" onClick={() => setEvaluacion(null)}><Icono nombre="pluma" tam={18} /> {ok ? "Revisar cláusulas" : "Corregir el acuerdo"}</button>
+          {ok && <Link href="/mundo/separacion" className="btn btn-primario">Ir al tribunal <Icono nombre="mazo" tam={18} /></Link>}
+        </div>
+      </Actividad>
+    );
+  }
+
+  const marcadas = ITEMS.filter((it) => a[it.k]).length;
 
   return (
-    <div className="space-y-4">
-      <h2 className="label-art text-neon-blue text-xl">Acuerdo regulador completo y suficiente (arts. 21 y 27 LMC)</h2>
-      <p className="text-parchment/60 text-sm">
-        Para el divorcio de común acuerdo (art. 55 inc. 1° LMC), los cónyuges deben acompañar un acuerdo que regule
-        sus relaciones mutuas y respecto de los hijos comunes. El acuerdo será COMPLETO si cubre todas las materias
-        del art. 21 y SUFICIENTE si resguarda el interés superior de los hijos, procura aminorar el menoscabo económico
-        y establece relaciones equitativas entre los cónyuges.
-      </p>
-
-      <div className="terminal p-4 space-y-2">
-        {ITEMS.map((it) => (
-          <label key={it.k as string} className="flex items-start gap-3 text-xs">
-            <input type="checkbox" checked={!!a[it.k]} onChange={() => toggle(it.k)} className="mt-1" />
-            <div>
-              <div className="text-parchment">{it.label}</div>
-              <div className="text-parchment/50 text-[10px]">{it.art}</div>
-            </div>
-          </label>
-        ))}
-      </div>
-
-      <button className="btn" onClick={evaluar}>▸ Evaluar acuerdo</button>
-
-      {eval_ && (
-        <div className={`terminal p-4 ${eval_.completo && eval_.suficiente ? "border-neon-blue" : "border-neon-red"}`}>
-          <div className={`label-art ${eval_.completo && eval_.suficiente ? "text-neon-blue" : "text-neon-red"}`}>
-            {eval_.completo && eval_.suficiente ? "✓ Acuerdo completo y suficiente" : "✗ Acuerdo insuficiente"}
-          </div>
-          <div className="tag tag-violet mt-2">{eval_.articulo}</div>
-          {eval_.observaciones.length > 0 && (
-            <ul className="mt-3 text-xs space-y-1 text-parchment/70">
-              {eval_.observaciones.map((o, i) => <li key={i}>• {o}</li>)}
-            </ul>
+    <Actividad titulo="Redacta las cláusulas" objetivo={cap.objetivo} progreso={progreso} regla={REGLA} introClave="intro:acuerdo" lugar="despacho">
+      {aprobado && <p className="insignia self-start" data-tono="verde"><Icono nombre="check" tam={14} /> Ya tienes un acuerdo aprobado</p>}
+      <div className="cuerpo">
+        <Paginado
+          items={ITEMS}
+          clave={(it) => it.k}
+          etiqueta="Cláusulas"
+          gap={6}
+          columnas={(w) => (w > 760 ? 2 : 1)}
+          render={(it) => (
+            <button type="button" role="checkbox" aria-checked={!!a[it.k]} className="fila-check" onClick={() => toggle(it.k)}>
+              <span className="caja" aria-hidden>{a[it.k] && <Icono nombre="check" tam={16} grosor={3} />}</span>
+              <span className="min-w-0">
+                <span className="block t-base txt-1">{it.label}</span>
+                <span className="block t-meta txt-3">{it.art}</span>
+              </span>
+            </button>
           )}
-        </div>
-      )}
-    </div>
+        />
+      </div>
+      <div className="barra-accion">
+        <span className="t-meta txt-2 fijo">{marcadas} de {ITEMS.length} cláusulas</span>
+        <button type="button" className="btn btn-primario" onClick={evaluar}>Presentar al tribunal <Icono nombre="flechaDer" tam={18} /></button>
+      </div>
+    </Actividad>
   );
 }
