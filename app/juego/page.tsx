@@ -8,18 +8,17 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import MarcaEva from "@/components/eva/MarcaEva";
 import { useGame, useMontado } from "@/store/useGame";
 import {
-  ACTOS, CAPITULOS, estadoCapitulo, progresoCapitulo, siguienteCapitulo, TEXTO_REQUISITO,
+  ACTOS, CAPITULOS, contextualizarCapitulo, estadoCapitulo, progresoCapitulo, siguienteCapitulo, TEXTO_REQUISITO,
   type Capitulo, type EstadoCapitulo,
 } from "@/data/capitulos";
 import { NOMBRE_ESTADO_CIVIL, NOMBRE_LUGAR, NOMBRE_REGIMEN } from "@/data/escenario";
 import GameShell from "@/components/ui/GameShell";
 import Icono from "@/components/ui/Icono";
-import { Paginado, useTamano } from "@/components/ui/Ajuste";
+import { Paginado } from "@/components/ui/Ajuste";
 import { Progreso } from "@/components/ui/Actividad";
-import { PlanoCiudad } from "@/components/arte/Escenario";
 
 const ETIQUETA: Record<EstadoCapitulo, string> = {
   bloqueado: "Bloqueado",
@@ -66,8 +65,8 @@ export default function Juego() {
   }, [montado, personaje.nombre, router]);
 
   const actoVisible = acto ?? sig?.acto ?? 1;
-  const caps = useMemo(() => CAPITULOS.filter((c) => c.acto === actoVisible), [actoVisible]);
-  const seleccionado = CAPITULOS.find((c) => c.id === sel) ?? (sig && sig.acto === actoVisible ? sig : caps[0]);
+  const caps = useMemo(() => CAPITULOS.filter((c) => c.acto === actoVisible).map((c) => contextualizarCapitulo(c, personaje.regimen)), [actoVisible, personaje.regimen]);
+  const seleccionado = caps.find((c) => c.id === sel) ?? caps.find((c) => c.id === sig?.id) ?? caps[0];
 
   if (!montado || !personaje.nombre) {
     return <GameShell titulo="Mapa del expediente" stats={false}><div /></GameShell>;
@@ -170,82 +169,27 @@ export default function Juego() {
   );
 }
 
-/** Ruta del acto: camino sinuoso sobre la ciudad en pantallas amplias; lista vertical paginada en teléfonos. */
+/** Mapa orbital: todos los destinos del acto caben sin arrastre horizontal. */
 function Ruta({ caps, seleccion, recomendado, onSel, acto }: { caps: Capitulo[]; seleccion: string; recomendado?: string; onSel: (id: string) => void; acto: number }) {
   const game = useGame();
-  const [ref, tam] = useTamano<HTMLDivElement>();
-  const amplio = tam.w >= 640 && tam.h >= 300;
-
-  // Puntos del camino (en %), en zigzag de izquierda a derecha.
   const puntos = caps.map((_, i) => {
-    const n = caps.length;
-    const x = n === 1 ? 50 : 12 + (76 * i) / (n - 1);
-    const y = i % 2 === 0 ? 34 : 70;
-    return { x, y };
+    const angulo = -Math.PI / 2 + (2 * Math.PI * i) / caps.length;
+    return { x: 50 + Math.cos(angulo) * 35, y: 50 + Math.sin(angulo) * 34 };
   });
-
-  return (
-    <div ref={ref} className="relative flex-1 min-h-0 flex flex-col">
-      {amplio ? (
-        <div className="absolute inset-0 overflow-hidden rounded-b-[10px]">
-          <div className="absolute inset-0" aria-hidden>
-            <PlanoCiudad />
-          </div>
-          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-            <polyline points={puntos.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#e0b25c" strokeOpacity="0.55" strokeWidth="0.6" strokeDasharray="1.5 1.2" vectorEffect="non-scaling-stroke" style={{ strokeWidth: 3 }} />
-          </svg>
-          <ol className="absolute inset-0" aria-label={`Capítulos del acto ${acto}`}>
-            {caps.map((c, i) => {
-              const est = estadoCapitulo(c, game);
-              const pr = progresoCapitulo(c.id, game);
-              return (
-                <li key={c.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${puntos[i].x}%`, top: `${puntos[i].y}%` }}>
-                  <motion.button
-                    type="button"
-                    whileHover={{ y: -3 }}
-                    onClick={() => onSel(c.id)}
-                    aria-pressed={seleccion === c.id}
-                    className={`flex flex-col items-center gap-1 w-[9.5rem] p-1.5 rounded-lg text-center ${seleccion === c.id ? "bg-[rgba(224,178,92,.12)] outline outline-2 outline-[var(--oro)]" : ""}`}
-                  >
-                    <Emblema cap={c} estado={est} recomendado={recomendado === c.id} />
-                    <span className="t-meta font-bold txt-1 leading-tight rounded px-1" style={{ background: "rgba(11,13,20,.85)" }}>{c.numeral} · {c.titulo}</span>
-                    <span className="t-micro txt-2 rounded px-1" style={{ background: "rgba(11,13,20,.85)" }}>
-                      {ETIQUETA[est]}{est === "en_curso" ? ` ${pr.hecho}/${pr.total}` : ""}
-                      {recomendado === c.id ? " · Siguiente" : ""}
-                    </span>
-                  </motion.button>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-      ) : (
-        <div className="flex-1 min-h-0 flex flex-col px-2 pb-1">
-          <Paginado
-            items={caps}
-            clave={(c) => c.id}
-            etiqueta="Capítulos"
-            gap={6}
-            reinicio={acto}
-            render={(c) => {
-              const est = estadoCapitulo(c, game);
-              const pr = progresoCapitulo(c.id, game);
-              return (
-                <button type="button" onClick={() => onSel(c.id)} aria-pressed={seleccion === c.id} className="eleccion !flex-row !items-center gap-3">
-                  <Emblema cap={c} estado={est} tam={44} recomendado={recomendado === c.id} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-bold txt-1 leading-tight">{c.numeral} · {c.titulo}</span>
-                    <span className="block t-meta txt-2">
-                      {ETIQUETA[est]}{est === "en_curso" ? ` · ${pr.hecho}/${pr.total}` : ""}
-                      {recomendado === c.id && <span className="txt-oro"> · Siguiente objetivo</span>}
-                    </span>
-                  </span>
-                </button>
-              );
-            }}
-          />
-        </div>
-      )}
+  return <>
+    <div className="eva-orbita" role="group" aria-label={`Capítulos del acto ${acto}`}>
+      <div className="eva-orbita-centro"><MarcaEva compacta /></div>
+      {caps.map((c, i) => {
+        const est = estadoCapitulo(c, game);
+        return <button key={c.id} type="button" className="eva-nodo" data-estado={est}
+          style={{ left: `${puntos[i].x}%`, top: `${puntos[i].y}%` }}
+          aria-pressed={seleccion === c.id} aria-label={`${c.numeral}. ${c.titulo}. ${ETIQUETA[est]}${recomendado === c.id ? ". Siguiente objetivo" : ""}`}
+          onClick={() => onSel(c.id)}>
+          <Icono nombre={est === "completado" ? "check" : est === "bloqueado" ? "candado" : c.icono} tam={20}/>
+          <span>{c.numeral}</span><small>{recomendado === c.id ? "Siguiente" : est === "completado" ? "Hecho" : est === "bloqueado" ? "Cerrado" : "Abrir"}</small>
+        </button>;
+      })}
     </div>
-  );
+    <p className="eva-mapa-leyenda"><span>○ Selecciona un nodo</span><span>✓ Completado</span><span>⌁ Ruta del expediente</span></p>
+  </>;
 }

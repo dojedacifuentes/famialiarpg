@@ -46,6 +46,10 @@ export const ESCENARIO: Record<string, { lugar: Lugar; retrato: TipoRetrato; cod
 
 // ── Etiquetas legibles ──────────────────────────────────────────────────────
 export const NOMBRE_CLASE: Record<ClaseBien, string> = {
+  individual_marido: "Patrimonio del marido",
+  individual_mujer: "Patrimonio de la mujer",
+  copropiedad: "Copropiedad acreditada",
+  titularidad_pendiente: "Titularidad por acreditar",
   haber_absoluto: "Haber absoluto",
   haber_relativo: "Haber relativo (con recompensa)",
   propio_marido: "Propio del marido",

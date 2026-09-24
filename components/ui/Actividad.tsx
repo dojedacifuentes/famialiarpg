@@ -55,7 +55,8 @@ export default function Actividad({
   const registrarHecho = useGame((s) => s.registrarHecho);
   const sexo = useGame((s) => s.personaje.sexo);
   const [verRegla, setVerRegla] = useState(false);
-  const enIntro = !!(introClave && regla && !(introClave in hechos));
+  // La regla queda disponible bajo demanda; no bloquea cada actividad nueva.
+  const enIntro = false;
 
   return (
     <div className="actividad">

@@ -8,9 +8,10 @@
 // ============================================================================
 import type { Bien, Personaje, SaveState } from "@/types/game";
 import { clasificarBien } from "@/lib/reglas";
+import { clasificarCaso } from "@/lib/clasificacion";
 import { CASOS_HABER, CASOS_SATELITE } from "@/data/casos";
 
-export const VERSION_PARTIDA = 4;
+export const VERSION_PARTIDA = 5;
 
 export const PERSONAJE_INICIAL: Personaje = {
   nombre: "",
@@ -102,6 +103,13 @@ export function migrarPartida(persistido: unknown, _version?: number): SaveState
   // salía del haber social. La afectación no muda el dominio (art. 141 ss.):
   // se recupera la clase original y se conserva la declaración.
   const bienes: Bien[] = arreglo<Bien>(p.bienes).map((b) => {
+    if (Number(p.version ?? 0) < 5 && personaje.regimen && personaje.regimen !== "sociedad_conyugal" && (b.cicloVital ?? 1) === personaje.cicloVital) {
+      const caso = CASOS_HABER.find((c) => c.nombre === b.nombre);
+      // No inventar titularidad de partidas antiguas: sólo recuperar sujetos expresos.
+      const titular = b.titular ?? caso?.adquirente ?? caso?.subroga?.delConyuge;
+      const clase = titular === "ambos" ? "copropiedad" : titular ? clasificarCaso({ ...caso!, adquirente: titular }, personaje.sexo, personaje.regimen).clase : "titularidad_pendiente";
+      return { ...b, clase, titular, regimenAdquisicion: personaje.regimen, generaRecompensa: 0, casoDidactico: !!caso, declaradoBienFamiliar: b.declaradoBienFamiliar || b.clase === "familiar" };
+    }
     if (b?.clase !== "familiar") return b;
     const { clase: _c, ...resto } = b;
     const original = clasificarBien(resto, personaje.sexo).clase;
@@ -128,7 +136,7 @@ export function migrarPartida(persistido: unknown, _version?: number): SaveState
     personaje,
     hijos: arreglo(p.hijos),
     bienes,
-    recompensas: arreglo(p.recompensas),
+    recompensas: Number(p.version ?? 0) < 5 && personaje.regimen && personaje.regimen !== "sociedad_conyugal" ? [] : arreglo(p.recompensas),
     incumplimientos: arreglo(p.incumplimientos),
     flags,
     log: arreglo(p.log),

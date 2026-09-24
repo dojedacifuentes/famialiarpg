@@ -17,6 +17,8 @@ import { Paginado } from "@/components/ui/Ajuste";
 import Icono from "@/components/ui/Icono";
 import Escenario from "@/components/arte/Escenario";
 import { pesos } from "@/data/escenario";
+import CierreRegimen from "@/components/CierreRegimen";
+import { esBienDelCiclo } from "@/lib/regimenes";
 
 type Fase =
   | "facción_inventario"   // Art. 1765 CC
@@ -60,11 +62,12 @@ export default function LiquidacionPage() {
     if (montado && !game.personaje.nombre) router.replace("/creacion");
   }, [montado, game.personaje.nombre, router]);
 
-  const calc = useMemo(() => liquidar(game.bienes), [game.bienes]);
+  const calc = useMemo(() => liquidar(game.bienes.filter((b) => esBienDelCiclo(b, game.personaje.cicloVital))), [game.bienes, game.personaje.cicloVital]);
   const idx = Math.min(FASES.length - 1, Number(game.hechos["liq:fase"] ?? 0));
   const f = FASES[idx];
 
   if (!montado || !game.personaje.nombre) return <GameShell titulo="Liquidación" stats={false}><div /></GameShell>;
+  if (game.personaje.regimen && game.personaje.regimen !== "sociedad_conyugal") return <CierreRegimen />;
 
   function irA(i: number) {
     game.fijarAvance("liq:fase", Math.max(0, Math.min(FASES.length - 1, i)));

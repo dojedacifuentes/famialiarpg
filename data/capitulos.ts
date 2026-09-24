@@ -4,7 +4,8 @@
 // Añadidos de juego (no jurídicos): acto, lugar, icono, objetivo y el cálculo
 // del progreso a partir del estado guardado.
 // ============================================================================
-import type { Mundo, SaveState } from "@/types/game";
+import type { Mundo, SaveState, Regimen } from "@/types/game";
+import { REGIMENES } from "@/lib/regimenes";
 import type { NombreIcono } from "@/components/ui/Icono";
 import type { Lugar } from "@/data/escenario";
 import { CASOS_HABER, CASOS_SATELITE } from "@/data/casos";
@@ -51,8 +52,17 @@ export const CAPITULOS: Capitulo[] = [
   { id: "examen", numeral: "XV", titulo: "Modo Examen", subt: "Cédula de 20 preguntas con explicación normativa.", acto: 4, lugar: "aula", icono: "examen", objetivo: "Rinde la cédula: se aprueba con 70 % de aciertos.", escenas: [] },
 ];
 
-export function capitulo(id: string): Capitulo | undefined {
-  return CAPITULOS.find((c) => c.id === id);
+export function contextualizarCapitulo(c: Capitulo, regimen?: Regimen): Capitulo {
+  if (!regimen || regimen === "sociedad_conyugal") return c;
+  const r = REGIMENES[regimen];
+  if (c.id === "haber") return { ...c, titulo: r.taller, subt: r.articulo, objetivo: "Acredita la titularidad de cada bien según tu régimen." };
+  if (c.id === "liquidacion") return { ...c, titulo: regimen === "separacion_total" ? "Cierre patrimonial" : "Crédito de participación", subt: r.articulo, objetivo: "Resuelve el cierre sin repartir automáticamente bienes individuales." };
+  return c;
+}
+
+export function capitulo(id: string, regimen?: Regimen): Capitulo | undefined {
+  const c = CAPITULOS.find((c) => c.id === id);
+  return c ? contextualizarCapitulo(c, regimen) : undefined;
 }
 
 type Estado = Pick<SaveState, "personaje" | "flags" | "escenas" | "hechos" | "hijos" | "bienes" | "conyuge" | "fechaCierta" | "ce" | "finalizado">;
@@ -106,7 +116,7 @@ export function progresoCapitulo(id: Mundo, s: Estado): Progreso {
       return p(escenasHechas + casos, nEsc + CASOS_HABER.length, "haber:fin" in h);
     }
     case "patrimonios_satelite": {
-      if (s.personaje.sexo !== "femenino") return p(escenasHechas, nEsc);
+      if (s.personaje.sexo !== "femenino" || s.personaje.regimen !== "sociedad_conyugal") return p(escenasHechas, nEsc);
       const casos = CASOS_SATELITE.filter((_, i) => `sat:${i}` in h).length;
       return p(escenasHechas + casos + ("opcion150" in h ? 1 : 0), nEsc + CASOS_SATELITE.length + 1);
     }
@@ -129,7 +139,7 @@ export function progresoCapitulo(id: Mundo, s: Estado): Progreso {
       const intentos = contar(h, "nulidad:");
       return p(intentos, 4, s.personaje.estadoCivil === "nulidad" || intentos >= 4);
     }
-    case "liquidacion": return p(s.finalizado ? 9 : Number(h["liq:fase"] ?? 0), 9, !!s.finalizado);
+    case "liquidacion": return s.personaje.regimen && s.personaje.regimen !== "sociedad_conyugal" ? p(s.finalizado ? 3 : Number(h["cierre:fase"] ?? 0), 3, !!s.finalizado) : p(s.finalizado ? 9 : Number(h["liq:fase"] ?? 0), 9, !!s.finalizado);
     case "segunda_vida": return p(escenasHechas, nEsc);
     case "examen": {
       const avance = Array.isArray(h["examen:respuestas"]) ? (h["examen:respuestas"] as number[]).length : 0;

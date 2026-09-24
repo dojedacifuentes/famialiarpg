@@ -38,7 +38,7 @@ export default function PatrimonioSatelitePanel() {
   const cap = capitulo("patrimonios_satelite")!;
   const progreso = progresoCapitulo("patrimonios_satelite", game);
 
-  if (personaje.sexo !== "femenino") {
+  if (personaje.sexo !== "femenino" || personaje.regimen !== "sociedad_conyugal") {
     return (
       <Actividad titulo="Patrimonios satélite" objetivo={cap.objetivo} lugar="banco" retrato="ejecutiva">
         <div className="cuerpo">

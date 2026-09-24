@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useGame } from "@/store/useGame";
 import Icono, { type NombreIcono } from "./Icono";
+import GuiaEva from "@/components/eva/GuiaEva";
 
 export type Volver = { href: string; etiqueta: string } | { onClick: () => void; etiqueta: string };
 
@@ -125,6 +126,7 @@ export default function GameShell({
           <h1 className="hud-nombre">{titulo}</h1>
         </div>
         {acciones}
+        <GuiaEva />
         {stats && <HudStats />}
       </header>
       <main id="escena" className="shell-main" aria-label={etiquetaMain ?? titulo} tabIndex={-1}>

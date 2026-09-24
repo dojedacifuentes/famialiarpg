@@ -21,14 +21,16 @@ import Icono from "@/components/ui/Icono";
 import { conCambios } from "@/lib/cambios";
 import type { Delta } from "@/lib/deltas";
 import Link from "next/link";
+import { casoParaRegimen, opcionesPatrimoniales, REGIMENES } from "@/lib/regimenes";
 
-const CLASES: ClaseBien[] = ["haber_absoluto", "haber_relativo", "propio_marido", "propio_mujer", "reservado_art150"];
 
 type Resultado = { i: number; elegida: ClaseBien; ok: boolean; correcta: ClaseBien; justificacion: string; articulo: string; deltas: Delta[]; repaso: boolean; pista: boolean };
 
 export default function ClasificadorBienes() {
   const game = useGame();
   const { hechos, personaje } = game;
+  const regimen = personaje.regimen ?? "sociedad_conyugal";
+  const contexto = REGIMENES[regimen];
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const lectura = useLectura();
   const cap = capitulo("haber")!;
@@ -37,12 +39,12 @@ export default function ClasificadorBienes() {
   const repaso = CASOS_HABER.map((_, i) => i).filter((i) => hechos[`haber:${i}`] === "error" && !(`haber:rep:${i}` in hechos));
   const enRepaso = pendientes.length === 0;
   const actual = enRepaso ? repaso[0] : pendientes[0];
-  const caso = actual !== undefined ? CASOS_HABER[actual] : undefined;
+  const caso = useMemo(() => actual !== undefined ? casoParaRegimen(CASOS_HABER[actual], regimen, personaje.sexo) : undefined, [actual, regimen, personaje.sexo]);
   const pistaVista = actual !== undefined && `haber:pista:${actual}` in hechos;
   const aciertos = CASOS_HABER.filter((_, i) => hechos[`haber:${i}`] === "ok").length;
   const progreso = progresoCapitulo("haber", game);
 
-  const corr = useMemo(() => (caso ? clasificarCaso(caso, personaje.sexo) : null), [caso, personaje.sexo]);
+  const corr = useMemo(() => (caso ? clasificarCaso(caso, personaje.sexo, regimen) : null), [caso, personaje.sexo, regimen]);
 
   function responder(c: ClaseBien) {
     if (!caso || !corr || actual === undefined) return;
@@ -65,6 +67,9 @@ export default function ClasificadorBienes() {
           adquiridoAntesDelMatrimonio: caso.adquiridoAntesDelMatrimonio,
           subroga: caso.subroga,
           clase: corr.clase,
+          titular: corr.adquirente,
+          regimenAdquisicion: regimen,
+          casoDidactico: true,
           generaRecompensa: corr.recompensa,
         };
         game.addBien(bien);
@@ -97,11 +102,11 @@ export default function ClasificadorBienes() {
   }
 
   const regla = {
-    titulo: "Clasificación del haber",
+    titulo: contexto.taller,
     parrafos: [
-      <>Distingue tres ejes: <b>naturaleza</b> (mueble/inmueble/dinero) — <b>título</b> (oneroso/gratuito) — <b>momento</b> (antes/durante). Si tu personaje es mujer en SC, recuerda el patrimonio reservado del art. 150.</>,
+      <>{contexto.regla}</>,
     ],
-    articulo: "Arts. 1725, 1726, 1727, 1736, 150 CC",
+    articulo: contexto.articulo,
   };
 
   // ── Resultado de un caso ──────────────────────────────────────────────
@@ -121,7 +126,7 @@ export default function ClasificadorBienes() {
                 : `Elegiste «${NOMBRE_CLASE[r.elegida]}». ${r.repaso ? "Queda para el códex: relee la regla." : "Este caso volverá en la segunda revisión."}`
             }
             deltas={r.deltas}
-            regla={{ articulo: r.articulo, texto: r.justificacion, codex: "1725" }}
+            regla={{ articulo: r.articulo, texto: r.justificacion, codex: regimen === "sociedad_conyugal" ? "1725" : undefined }}
           />
         </div>
         <div className="barra-accion">
@@ -146,12 +151,12 @@ export default function ClasificadorBienes() {
             narrativa={
               <>
                 {porcentaje >= 80 && "Tu intuición patrimonial es notarial. "}
-                {porcentaje < 50 && "Vuelve al codex y relee los arts. 1725, 1726, 1727 y 1736. "}
+                {porcentaje < 50 && `Revisa la regla: ${contexto.articulo}. `}
                 Los bienes correctamente clasificados se han registrado en tu inventario.
               </>
             }
             deltas={porcentaje >= 80 ? [{ texto: "Logro disponible: Intuición notarial", signo: "•", tono: "oro" }] : []}
-            regla={{ articulo: "Art. 1725 CC", texto: "Composición del haber social.", codex: "1725" }}
+            regla={{ articulo: contexto.articulo, texto: contexto.regla }}
           />
         </div>
         <div className="barra-accion">
@@ -200,6 +205,7 @@ export default function ClasificadorBienes() {
           <p className="t-meta txt-2 mt-1">
             <span className="txt-oro cifra font-bold">{pesos(caso.valor)}</span> · {chips.join(" · ")}
           </p>
+          {regimen !== "sociedad_conyugal" && <p className="t-meta txt-cian mt-1">Supuesto acreditado: adquiere {corr.adquirente === "mujer" ? "la mujer" : "el marido"}, a su nombre y con fondos propios. Cada caso es independiente.</p>}
           {pistaVista && (
             <p className="t-meta txt-violeta flex gap-1.5 mt-1"><Icono nombre="lampara" tam={16} className="mt-0.5" /> <span>Pista: {caso.pista}</span></p>
           )}
@@ -210,7 +216,7 @@ export default function ClasificadorBienes() {
             <span className="t-micro txt-3">{pistaVista ? "Con pista: sin bonificación" : "Sin pista: +1 Int. jurídica si aciertas"}</span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-2" role="group" aria-labelledby="clases-haber">
-            {CLASES.map((c) => (
+            {opcionesPatrimoniales(regimen).map((c) => (
               <button key={c} type="button" className="btn btn-secundario text-left justify-start" onClick={() => responder(c)}>
                 {NOMBRE_CLASE[c]}
               </button>

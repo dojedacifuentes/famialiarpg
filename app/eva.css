@@ -1,0 +1,53 @@
+/* EVA ARCADE: luz de señal sobre superficies oscuras estables. */
+:root{--fondo:#060913;--sup-1:#101827;--sup-2:#0c1220;--sup-alta:#18243a;--linea:#293950;--linea-fuerte:#405772;--texto:#f1f6ff;--texto-2:#c5d3e6;--texto-3:#a3b5cd;--oro:#75d8ff;--oro-claro:#b4eaff;--cian:#75d8ff;--violeta:#c5a4ff;--verde:#7ee1bc;--rojo:#ff8fa3;--eva-legal:#e3c182;}
+h1,h2,h3,.font-display{font-family:var(--fuente-display),system-ui,sans-serif;letter-spacing:-.015em;}
+.fondo-noche{background:radial-gradient(ellipse at 0 0,#10244055,transparent 55%),radial-gradient(ellipse at 100% 100%,#27163c44,transparent 50%),var(--fondo)!important;}
+.fondo-noche::before,.fondo-noche::after,.lluvia{display:none!important;}
+.panel{background:linear-gradient(135deg,var(--sup-1),var(--sup-2));border-color:var(--linea);}
+.marco::before,.marco::after{opacity:.25;}
+.btn{transition:background-color .15s ease,border-color .15s ease,transform .15s ease;min-height:44px;}
+.btn:active:not(:disabled){transform:translateY(1px);}
+.btn-primario{background:var(--cian)!important;color:#061322!important;border-color:#b4eaff!important;box-shadow:0 0 22px #55bdff15;}
+.btn-secundario{background:#142035!important;border-color:#34465e!important;color:var(--texto)!important;}
+.btn-secundario:hover:not(:disabled){border-color:var(--cian)!important;background:#1a2d46!important;}
+.articulo{color:var(--eva-legal);background:#211e19;border-color:#665738;}
+.eleccion[aria-checked=true],.eleccion[aria-pressed=true],.fila-check[aria-checked=true]{background:#172d43!important;border-color:var(--cian)!important;}
+.shell-hud,.shell-nav{background:#0a1020f5;border-color:var(--linea);}
+.nav-enlace[aria-current=page]{background:#142d43;color:var(--cian);}
+.eva-marca{display:flex;align-items:center;justify-content:center;gap:18px;color:#d1d8ff;}
+.eva-marca svg{width:180px;max-width:50%;height:auto;filter:drop-shadow(0 0 8px #4db8ff66);}
+.eva-wordmark{font-family:var(--fuente-display),sans-serif;font-size:14px;letter-spacing:.23em;white-space:nowrap;}
+.eva-marca-compacta svg{width:75px}.eva-marca-compacta .eva-wordmark{font-size:10px;letter-spacing:.1em;}
+.eva-ayuda{display:flex;align-items:center;gap:6px;min-height:44px;border:1px solid #405772;border-radius:30px;padding:3px 10px 3px 3px;background:#101d32;font-weight:700;flex-shrink:0;}
+.eva-ayuda img{border-radius:50%;}.eva-online{color:var(--verde)}
+.eva-guia-cabecera{display:flex;align-items:center;gap:16px}.eva-guia-cabecera img{border-radius:20px;border:1px solid var(--linea-fuerte)}
+.eva-storage-aviso{position:fixed;z-index:100;inset:0 0 auto;background:#452333;padding:12px;display:flex;gap:12px;align-items:center;}
+.eva-home{background:radial-gradient(ellipse at 15% 30%,#0d3c6666,transparent 60%),radial-gradient(ellipse at 95% 65%,#47175c55,transparent 60%),#060913;}
+.eva-home .portada-contenido{max-width:560px;width:100%;background:#0a1224ee;border-color:#314965;padding:clamp(18px,4vw,36px);gap:14px;box-shadow:0 25px 100px #0007;}
+.eva-home .portada-fondo{background:url('/eva/identidad-eva.webp') center/cover;opacity:.14;filter:saturate(.7);}
+.eva-kicker{text-transform:uppercase;letter-spacing:.18em;font-size:12px;color:var(--cian);text-align:center;}
+.eva-home h1{font-size:clamp(28px,5vw,48px);line-height:1.05;margin:6px 0;}
+.eva-home .eva-subtitle{font-size:clamp(15px,2vw,18px);line-height:1.45;color:var(--texto-2);text-align:center;}
+.eva-footer{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--texto-3);}
+.eva-footer a{min-height:44px;display:inline-flex;align-items:center;}
+.eva-orbita{position:relative;flex:1;min-height:190px;background:radial-gradient(ellipse at center,#20355b66,transparent 65%);isolation:isolate;}
+.eva-orbita::before,.eva-orbita::after{content:'';position:absolute;inset:15% 17%;border:1px solid #537aa255;border-radius:50%;pointer-events:none;}
+.eva-orbita::after{inset:24% 26%;border-color:#766bb044;}
+.eva-orbita-centro{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:.65;}
+.eva-orbita-centro .eva-wordmark{display:none}.eva-orbita-centro svg{max-width:none;width:58px;}
+.eva-nodo{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;justify-content:center;width:72px;min-height:58px;border:1px solid #415771;border-radius:12px;background:#0e1a2b;color:var(--texto);gap:2px;}
+.eva-nodo[data-estado=bloqueado]{border-style:dashed;color:#a3b5cd;background:#0b1220;}
+.eva-nodo[data-estado=completado]{border-color:var(--verde);}
+.eva-nodo[aria-pressed=true]{border-color:var(--cian);box-shadow:0 0 0 3px #75d8ff25,0 0 25px #48afff22;background:#173047;}
+.eva-nodo span{font-size:12px;font-weight:700;}.eva-nodo small{font-size:10px;}
+.eva-mapa-leyenda{display:flex;justify-content:center;gap:14px;padding:5px;font-size:11px;color:var(--texto-3);}
+.mapa-ficha{background:#111c2d!important;}
+.eva-rapida{width:min(100%,700px);margin:auto;display:flex;flex-direction:column;gap:12px;min-height:0;height:100%;}
+.eva-rapida-cuerpo{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
+.eva-respuesta{border-left:3px solid var(--cian);padding:12px;background:#12243a;}
+.eva-regimenes{display:grid;gap:8px;}.eva-regimenes button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
+html[data-movimiento=no] *,html[data-movimiento=no] *::before,html[data-movimiento=no] *::after{animation:none!important;transition:none!important;}
+@media(max-width:540px){.shell-hud{gap:6px}.eva-ayuda{padding-right:4px}.eva-ayuda>span{display:none}.hud-stats{gap:3px}.eva-home .portada-contenido{gap:10px}.eva-home .eva-footer{gap:12px}.mapa-ficha{padding:10px}.mapa-ficha .barra-accion .btn{width:100%}.mapa-ficha>p:first-of-type{display:none}.eva-nodo{width:58px;min-height:54px}.eva-guia-cabecera img{width:72px;height:72px}}
+@media(max-height:700px){.eva-home .portada-contenido{gap:7px;padding:16px}.eva-home .eva-footer{display:none}.eva-home .eva-marca svg{width:110px}.eva-home h1{font-size:30px}}
+@media(max-height:580px){.mapa{height:auto;min-height:450px}.eva-orbita{min-height:180px}.shell-main{overflow-y:auto}.eva-rapida{height:auto;min-height:100%}.eva-rapida-cuerpo{overflow:visible}}
+@media(prefers-reduced-motion:no-preference){.eva-nodo{transition:background .18s,border-color .18s,box-shadow .18s}.eva-home .eva-marca{animation:eva-entrada .7s ease-out both}@keyframes eva-entrada{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}}

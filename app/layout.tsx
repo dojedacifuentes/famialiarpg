@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Atkinson_Hyperlegible, Cinzel } from "next/font/google";
+import { Atkinson_Hyperlegible, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import "./eva.css";
 import Proveedores from "@/components/ui/Proveedores";
 
 // ============================================================================
@@ -11,7 +12,7 @@ import Proveedores from "@/components/ui/Proveedores";
 // next/font las descarga al compilar y las sirve desde el propio dominio:
 // no hay hoja de estilo externa que bloquee el primer render.
 // ============================================================================
-const display = Cinzel({
+const display = Space_Grotesk({
   subsets: ["latin", "latin-ext"],
   weight: ["600", "700"],
   display: "swap",
@@ -27,7 +28,9 @@ const lectura = Atkinson_Hyperlegible({
 });
 
 export const metadata: Metadata = {
-  title: "Expediente 1725 — Derecho de Familia RPG",
+  title: "EVA ARCADE · Expediente 1725",
+  metadataBase: new URL("https://famialiarpg.vercel.app"),
+  openGraph: { title: "EVA ARCADE · Expediente 1725", description: "Decide. Descubre las consecuencias. Un RPG de Derecho de Familia chileno.", locale: "es_CL", type: "website" },
   description: "RPG narrativo de Derecho de Familia chileno: decide, observa las consecuencias y aprende la regla que las explica.",
 };
 
@@ -39,7 +42,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#0b0d14",
+  themeColor: "#060913",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

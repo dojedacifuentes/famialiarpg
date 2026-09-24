@@ -5,8 +5,8 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useGame, useMontado } from "@/store/useGame";
-import Escenario from "@/components/arte/Escenario";
-import Retrato from "@/components/arte/Retrato";
+import MarcaEva from "@/components/eva/MarcaEva";
+import GuiaEva from "@/components/eva/GuiaEva";
 import Hoja from "@/components/ui/Hoja";
 import Icono from "@/components/ui/Icono";
 
@@ -24,25 +24,24 @@ export default function Home() {
   const hayPartida = montado && !!personaje.nombre;
 
   return (
-    <main className="portada">
+    <main className="portada eva-home">
       <div className="portada-fondo" aria-hidden>
-        <Escenario lugar="notaria" />
-        <div className="portada-retrato"><Retrato tipo="notario" className="w-full h-full respirar" /></div>
       </div>
       <motion.div className="portada-contenido" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-        <div className="insignia self-center" data-tono="oro">Expediente N° 1725-2026 · Foro interior</div>
+        <MarcaEva />
+        <div className="eva-kicker">Un universo de decisiones</div>
         <h1 className="t-display text-center txt-1">
-          <span className="block text-[0.55em] txt-oro tracking-[0.2em]">Expediente 1725</span>
-          Derecho de Familia
+          Expediente 1725
         </h1>
-        <p className="t-lectura text-center txt-2 max-w-xl mx-auto">
-          Un RPG narrativo sobre matrimonio, patrimonio, deberes y reconstrucción.
+        <p className="eva-subtitle">
+          El amor cambia. El expediente queda.<br/>Decide, descubre las consecuencias y aprende Derecho de Familia.
         </p>
         <nav className="grid gap-2 w-full max-w-sm mx-auto" aria-label="Menú principal">
           {!montado ? (
             <span className="btn btn-secundario" aria-busy="true">Cargando expediente…</span>
           ) : (
             <>
+              <Link href="/rapida" className={`btn ${hayPartida ? "btn-secundario" : "btn-primario"}`}>Partida rápida · ~3 min <Icono nombre="flechaDer" tam={18}/></Link>
               {hayPartida && !finalizado && (
                 <Link href="/juego" className="btn btn-primario">
                   <Icono nombre="mapa" tam={18} /> Continuar · {personaje.nombre} · ciclo {personaje.cicloVital}
@@ -51,8 +50,8 @@ export default function Home() {
               {hayPartida && finalizado && (
                 <Link href="/epilogo" className="btn btn-primario"><Icono nombre="pergamino" tam={18} /> Leer epílogo</Link>
               )}
-              <Link href="/creacion" className={`btn ${hayPartida ? "btn-secundario" : "btn-primario"}`}>
-                <Icono nombre="pluma" tam={18} /> Nueva partida
+              <Link href="/creacion" className="btn btn-secundario">
+                <Icono nombre="pluma" tam={18} /> Nueva campaña
               </Link>
               <div className="grid grid-cols-2 gap-2">
                 <Link href="/codex" className="btn btn-secundario"><Icono nombre="codex" tam={18} /> Códex</Link>
@@ -64,6 +63,8 @@ export default function Home() {
             </>
           )}
         </nav>
+        <div className="flex justify-center"><GuiaEva /></div>
+        <footer className="eva-footer"><a href="https://evaproyecto01.vercel.app/" target="_blank" rel="noopener noreferrer">Universo EVA ↗</a><a href="https://www.instagram.com/eva.proyecto01/" target="_blank" rel="noopener noreferrer">Instagram ↗</a></footer>
       </motion.div>
 
       <Hoja abierta={acerca} onCerrar={() => setAcerca(false)} titulo="Acerca del juego">

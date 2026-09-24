@@ -15,19 +15,21 @@ export function generarEpilogo(game: Pick<SaveState, "personaje" | "hijos" | "fl
   const bigamia = game.flags.includes("bigamia_oculta");
   const ceFalsa = game.flags.includes("cese_falso");
   const incumpl = (game.incumplimientos || []).filter((i) => i.habilitaCulpa).length;
-  const opcion150 = game.hechos?.["opcion150"];
+  const opcion150 = p.regimen === "sociedad_conyugal" ? game.hechos?.["opcion150"] : undefined;
 
   const tono = p.trauma > 70 ? "ruinoso" : p.reputacion > 30 ? "ejemplar" : "gris";
 
   const lineas: string[] = [];
   lineas.push(`${p.nombre}, ${p.profesion} de origen ${p.origen}, completó el ciclo vital N°${p.cicloVital} el ${new Date().toLocaleDateString("es-CL")}.`);
   lineas.push(`Estado civil definitivo del ciclo: ${p.estadoCivil}. Régimen: ${p.regimen?.replace(/_/g, " ") ?? "ninguno"}.`);
-  lineas.push(`Tras la partición, le correspondió una cuota de gananciales de aproximadamente $${cuota.toLocaleString("es-CL")}.`);
+  if (p.regimen === "separacion_total") lineas.push("Cerró el régimen manteniendo las titularidades individuales. No se repartió una sociedad conyugal inexistente.");
+  else if (p.regimen === "participacion_gananciales") lineas.push("Completó el ejercicio del crédito de participación. El crédito real exige balances netos ajustados; el ejemplo no adjudicó bienes ni generó una deuda en su expediente.");
+  else lineas.push(`El modelo didáctico de sociedad conyugal arrojó una cuota estimada de $${cuota.toLocaleString("es-CL")}. No constituye una adjudicación real.`);
   if (opcion150 === "aceptar") lineas.push("Ejerció la opción del art. 150 inc. final: aceptó los gananciales, y su patrimonio reservado se confundió con el haber social.");
   if (opcion150 === "renunciar") lineas.push("Ejerció la opción del art. 150 inc. final: renunció a los gananciales y conservó íntegro su patrimonio reservado.");
   if (incumpl > 0) lineas.push(`Acumuló ${incumpl} incumplimientos graves de deberes recíprocos (art. 131 ss. CC). Esto pudo bloquear su compensación económica (art. 62 inc. 2° LMC).`);
   if (game.recompensas?.length) lineas.push(`Acumuló ${game.recompensas.length} asientos en el libro de recompensas (arts. 1769-1779).`);
-  if (moroso) lineas.push(`Murió esperando inscripción conservatoria mientras evadía un apremio personal por alimentos impagos (Ley 14.908 y Ley 21.389).`);
+  if (moroso) lineas.push("Quedaron obligaciones alimenticias pendientes: requieren atención prioritaria y pueden dar lugar a medidas de cumplimiento conforme a la ley.");
   if (fraude) lineas.push(`Se rumorea que simuló una enajenación: la nulidad relativa pende sobre su tumba (art. 1682 CC).`);
   if (bigamia) lineas.push(`Su primer matrimonio nunca fue disuelto; el segundo fue declarado nulo, pero los hijos conservaron la calidad de matrimoniales por buena fe (art. 51 LMC).`);
   if (vif) lineas.push(`La VIF dejó marcas que la jurisprudencia llamó "daño moral indemnizable" (Ley 20.066).`);

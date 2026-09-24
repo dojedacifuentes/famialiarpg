@@ -75,7 +75,7 @@ describe("capítulos", () => {
 describe("epílogo", () => {
   it("recuerda la opción del art. 150 y conserva el epitafio", () => {
     const s = { ...estadoInicial(), hechos: { opcion150: "renunciar" } };
-    s.personaje = { ...s.personaje, nombre: "Ana" };
+    s.personaje = { ...s.personaje, nombre: "Ana", regimen: "sociedad_conyugal" };
     const t = generarEpilogo(s, { cuotaPorConyuge: 1000 });
     expect(t).toContain("renunció a los gananciales");
     expect(t).toContain("Su epitafio:");

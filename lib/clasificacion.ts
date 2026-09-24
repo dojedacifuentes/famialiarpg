@@ -2,10 +2,19 @@
 // toma del enunciado del caso cuando lo nombra; si no, del personaje jugador.
 import { clasificarBien } from "@/lib/reglas";
 import type { CasoHaber, RolConyugal } from "@/data/casos";
-import type { Sexo } from "@/types/game";
+import type { Sexo, Regimen, ClaseBien } from "@/types/game";
+import { REGIMENES } from "@/lib/regimenes";
 
-export function clasificarCaso(caso: CasoHaber, sexoJugador: Sexo) {
+export function clasificarCaso(caso: CasoHaber, sexoJugador: Sexo, regimen: Regimen = "sociedad_conyugal") {
   const adquirente: RolConyugal = caso.adquirente ?? (sexoJugador === "femenino" ? "mujer" : "marido");
+  if (regimen !== "sociedad_conyugal") {
+    return {
+      clase: (adquirente === "mujer" ? "individual_mujer" : "individual_marido") as ClaseBien,
+      recompensa: 0, adquirente,
+      articulo: REGIMENES[regimen].articulo,
+      justificacion: `El supuesto acredita que adquiere ${adquirente === "mujer" ? "la mujer" : "el marido"}. El bien integra su patrimonio individual. ${regimen === "participacion_gananciales" ? "Para el eventual crédito final se necesita un balance neto ajustado; este valor aislado no equivale a gananciales." : "No hay haber social ni recompensa propia de sociedad conyugal; otros créditos requieren antecedentes."}`,
+    };
+  }
   const r = clasificarBien(
     {
       id: "caso",

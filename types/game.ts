@@ -40,6 +40,10 @@ export type Personaje = {
 // ============== BIENES ==============
 // Clases conforme arts. 1725 ss. y patrimonios satélites (150, 166, 167)
 export type ClaseBien =
+  | "individual_marido"
+  | "individual_mujer"
+  | "copropiedad"
+  | "titularidad_pendiente"
   | "haber_absoluto"         // Art. 1725 N°1, 2, 5
   | "haber_relativo"         // Art. 1725 N°3, 4 (con recompensa)
   | "propio_marido"          // Arts. 1726, 1736
@@ -65,6 +69,10 @@ export type Bien = {
   generaRecompensa?: number;
   declaradoBienFamiliar?: boolean;
   cicloVital?: number;
+  titular?: "marido" | "mujer" | "ambos";
+  regimenAdquisicion?: Regimen;
+  /** Los casos del taller son independientes, no un balance consolidado. */
+  casoDidactico?: boolean;
   // Para subrogación (arts. 1727-1733): el bien que se sustituye debe ser propio
   subroga?: { delConyuge: "marido" | "mujer"; eraInmueble: boolean };
 };

@@ -1,4 +1,5 @@
 "use client";
+import { almacenamientoSeguro } from "@/lib/almacenamiento";
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
@@ -107,6 +108,7 @@ export const useGame = create<Store>()(
           },
           conyuge: undefined,
           bienes: s.bienes.filter((b) =>
+            b.clase === "individual_marido" || b.clase === "individual_mujer" || b.clase === "copropiedad" || b.clase === "titularidad_pendiente" ||
             b.clase === "propio_marido" ||
             b.clase === "propio_mujer" ||
             b.clase === "reservado_art150" ||
@@ -176,11 +178,7 @@ export const useGame = create<Store>()(
       // Garantiza la forma v4 incluso si el guardado tiene la versión correcta
       // pero le faltan campos (edición manual, guardado a medias).
       merge: (persistido, actual) => ({ ...actual, ...migrarPartida(persistido) }),
-      storage: createJSONStorage(() =>
-        typeof window !== "undefined"
-          ? window.localStorage
-          : ({ getItem: () => null, setItem: () => {}, removeItem: () => {} } as unknown as Storage)
-      ),
+      storage: createJSONStorage(() => almacenamientoSeguro),
     }
   )
 );

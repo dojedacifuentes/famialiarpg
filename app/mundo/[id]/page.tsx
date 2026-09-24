@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ESCENAS } from "@/data/dialogos";
+import { escenaParaRegimen } from "@/lib/escenas-regimen";
 import DialogoEscena from "@/components/DialogoEscena";
 import { useGame, useMontado } from "@/store/useGame";
 import type { Mundo } from "@/types/game";
@@ -54,9 +55,9 @@ const PANELES: Partial<Record<Mundo, () => JSX.Element>> = {
 export default function MundoPage() {
   const montado = useMontado();
   const { id } = useParams<{ id: string }>();
-  const cap = capitulo(id);
   const router = useRouter();
   const game = useGame();
+  const cap = capitulo(id, game.personaje.regimen);
   const [bitacora, setBitacora] = useState(false);
 
   const pendientes = useMemo(() => (cap?.escenas ?? []).filter((e) => ESCENAS[e] && !(e in game.escenas)), [cap, game.escenas]);
@@ -108,10 +109,10 @@ export default function MundoPage() {
     contenido = <Bloqueado razon={cap.req ? TEXTO_REQUISITO[cap.req] : ""} />;
   } else if (vista.tipo === "escena" && ESCENAS[vista.id]) {
     const idEsc = vista.id;
-    contenido = <DialogoEscena key={idEsc} escena={ESCENAS[idEsc]} onFin={() => trasEscena(idEsc)} />;
+    contenido = <DialogoEscena key={idEsc} escena={escenaParaRegimen(ESCENAS[idEsc], game.personaje.regimen)} onFin={() => trasEscena(idEsc)} />;
   } else if (vista.tipo === "recuerdo" && ESCENAS[vista.id]) {
     const v = vista;
-    contenido = <DialogoEscena key={`rec-${v.id}`} escena={ESCENAS[v.id]} recuerdo textoContinuar="Salir del recuerdo" onFin={() => setVista(v.volver)} />;
+    contenido = <DialogoEscena key={`rec-${v.id}`} escena={escenaParaRegimen(ESCENAS[v.id], game.personaje.regimen)} recuerdo textoContinuar="Salir del recuerdo" onFin={() => setVista(v.volver)} />;
   } else if (Panel) {
     contenido = <Panel />;
   } else {
@@ -189,7 +190,7 @@ function Cierre({ mundo }: { mundo: Mundo }) {
   const router = useRouter();
   const game = useGame();
   const [confirmar, setConfirmar] = useState(false);
-  const cap = capitulo(mundo)!;
+  const cap = capitulo(mundo, game.personaje.regimen)!;
   const decisiones = cap.escenas.filter((e) => e in game.escenas && ESCENAS[e]).map((e) => ({ id: e, esc: ESCENAS[e], op: ESCENAS[e].opciones[game.escenas[e]] }));
   const sig = siguienteCapitulo(game);
 
@@ -207,7 +208,7 @@ function Cierre({ mundo }: { mundo: Mundo }) {
         ? `Se cerrará el ciclo ${game.personaje.cicloVital}: conservas bienes propios, reservados y satélites, hijos, logros y atributos; el cónyuge y el libro de recompensas quedan atrás.`
         : "La narrativa continúa. Cada acción se inscribe en el folio interior.",
     },
-    liquidacion: { titulo: "El expediente está listo para liquidación.", cta: "Iniciar liquidación", accion: () => router.push("/liquidacion"), cuerpo: "Nueve fases, cada una con su justificación normativa. Al final, tu epílogo." },
+    liquidacion: { titulo: "El expediente está listo para el cierre patrimonial.", cta: "Resolver el cierre", accion: () => router.push("/liquidacion"), cuerpo: "El cierre se adapta a tu régimen. La compensación económica es una materia distinta del reparto patrimonial." },
     examen: { titulo: "Modo examen: cédula final.", cta: "Comenzar examen", accion: () => router.push("/examen"), cuerpo: "Veinte preguntas tipo cédula de grado, con explicación normativa tras cada respuesta." },
   };
   const t = textos[mundo] ?? { titulo: "Capítulo concluido.", cta: "Volver al mapa", accion: () => router.push("/juego"), cuerpo: "" };

@@ -21,10 +21,11 @@ import { Paginado, TextoAjustado, useLectura } from "@/components/ui/Ajuste";
 import Consecuencia, { BotonContinuar } from "@/components/ui/Consecuencia";
 import Icono from "@/components/ui/Icono";
 import { animoDe, deltasDeEfectos } from "@/lib/deltas";
+import { usePreferencias } from "@/store/usePreferencias";
 
 type Paso = "lineas" | "decidir" | "consecuencia";
 
-function useEscritura(texto: string, activo: boolean) {
+function useEscritura(texto: string, activo: boolean, velocidad = 110) {
   const [n, setN] = useState(activo ? 0 : texto.length);
   const fin = useRef(false);
   useEffect(() => {
@@ -36,14 +37,14 @@ function useEscritura(texto: string, activo: boolean) {
     const paso = (t: number) => {
       if (fin.current) return;
       if (!inicio) inicio = t;
-      const k = Math.floor((t - inicio) * 0.11); // ≈ 110 caracteres por segundo
+      const k = Math.floor((t - inicio) * velocidad / 1000);
       if (k >= texto.length) { setN(texto.length); return; }
       setN(k);
       raf = requestAnimationFrame(paso);
     };
     raf = requestAnimationFrame(paso);
     return () => cancelAnimationFrame(raf);
-  }, [texto, activo]);
+  }, [texto, activo, velocidad]);
   const completar = useCallback(() => { fin.current = true; setN(texto.length); }, [texto]);
   return { n, completo: n >= texto.length, completar };
 }
@@ -84,6 +85,7 @@ export default function DialogoEscena({
 }) {
   const game = useGame();
   const reducir = useReducedMotion();
+  const prefs = usePreferencias();
   const lectura = useLectura();
   const decidida = !recuerdo && escena.id in game.escenas ? game.escenas[escena.id] : undefined;
   const lugar = ESCENARIO[escena.id] ?? { lugar: "notaria" as const, retrato: "notario" as const };
@@ -92,7 +94,7 @@ export default function DialogoEscena({
   const intervenciones = useMemo(
     () => [
       { quien: "Ambiente", texto: escena.ambientacion, narrador: true },
-      ...escena.lineas.map((t) => ({ quien: escena.speaker ?? "", texto: t, narrador: false })),
+      { quien: escena.speaker ?? "", texto: escena.lineas.join("\n\n"), narrador: false },
     ],
     [escena]
   );
@@ -119,7 +121,7 @@ export default function DialogoEscena({
   const actual = intervenciones[Math.min(linea, intervenciones.length - 1)];
   const lista = paginas.linea === linea ? paginas.lista : [actual.texto];
   const textoPagina = lista[Math.min(pagina, lista.length - 1)] ?? "";
-  const { n, completo, completar } = useEscritura(textoPagina, paso === "lineas" && !reducir);
+  const { n, completo, completar } = useEscritura(textoPagina, paso === "lineas" && !reducir && prefs.movimiento && prefs.lectura !== "instantanea", prefs.lectura === "rapida" ? 180 : 70);
   const opciones = Array.isArray(escena.opciones) ? escena.opciones : [];
   const ultima = linea >= intervenciones.length - 1 && pagina >= lista.length - 1;
 
@@ -132,6 +134,12 @@ export default function DialogoEscena({
     if (linea < intervenciones.length - 1) { setLinea(linea + 1); setPagina(0); return; }
     if (opciones.length === 0) {
       if (!recuerdo) game.resolverEscena(escena, -1);
+      onFin?.();
+      return;
+    }
+    // Una única acción de continuidad no necesita una pantalla de falsa elección.
+    if (opciones.length === 1 && !opciones[0].requiere && !opciones[0].efectos?.atributos && !opciones[0].efectos?.flags && !opciones[0].efectos?.trauma && !opciones[0].efectos?.reputacion) {
+      if (!recuerdo) game.resolverEscena(escena, 0);
       onFin?.();
       return;
     }
@@ -164,6 +172,7 @@ export default function DialogoEscena({
   estado.current = { siguiente, anterior, elegir, paso };
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
+      if (e.repeat) return;
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea, select, [role='dialog']")) return;
       const sobreBoton = !!t.closest("button, a");
