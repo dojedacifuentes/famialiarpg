@@ -15,9 +15,9 @@ h1,h2,h3,.font-display{font-family:var(--fuente-display),system-ui,sans-serif;le
 .shell-hud,.shell-nav{background:#0a1020f5;border-color:var(--linea);}
 .nav-enlace[aria-current=page]{background:#142d43;color:var(--cian);}
 .eva-marca{display:flex;align-items:center;justify-content:center;gap:18px;color:#d1d8ff;}
-.eva-marca svg{width:180px;max-width:50%;height:auto;filter:drop-shadow(0 0 8px #4db8ff66);}
-.eva-wordmark{font-family:var(--fuente-display),sans-serif;font-size:14px;letter-spacing:.23em;white-space:nowrap;}
-.eva-marca-compacta svg{width:75px}.eva-marca-compacta .eva-wordmark{font-size:10px;letter-spacing:.1em;}
+.eva-marca .eva-simbolo{height:64px}
+.eva-wordmark{font-family:var(--fuente-display),sans-serif;font-size:20px;font-weight:600;letter-spacing:.2em;white-space:nowrap;color:#e8ecff;}
+.eva-marca-compacta{gap:12px}.eva-marca-compacta .eva-simbolo{height:34px}.eva-marca-compacta .eva-wordmark{font-size:13px;letter-spacing:.16em;}
 .eva-ayuda{display:flex;align-items:center;gap:6px;min-height:44px;border:1px solid #405772;border-radius:30px;padding:3px 10px 3px 3px;background:#101d32;font-weight:700;flex-shrink:0;}
 .eva-ayuda img{border-radius:50%;}.eva-online{color:var(--verde)}
 .eva-guia-cabecera{display:flex;align-items:center;gap:16px}.eva-guia-cabecera img{border-radius:20px;border:1px solid var(--linea-fuerte)}
@@ -34,7 +34,7 @@ h1,h2,h3,.font-display{font-family:var(--fuente-display),system-ui,sans-serif;le
 .eva-orbita::before,.eva-orbita::after{content:'';position:absolute;inset:15% 17%;border:1px solid #537aa255;border-radius:50%;pointer-events:none;}
 .eva-orbita::after{inset:24% 26%;border-color:#766bb044;}
 .eva-orbita-centro{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:.65;}
-.eva-orbita-centro .eva-wordmark{display:none}.eva-orbita-centro svg{max-width:none;width:58px;}
+.eva-orbita-centro .eva-wordmark{display:none}.eva-orbita-centro .eva-simbolo{height:56px}
 .eva-nodo{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;justify-content:center;width:72px;min-height:58px;border:1px solid #415771;border-radius:12px;background:#0e1a2b;color:var(--texto);gap:2px;}
 .eva-nodo[data-estado=bloqueado]{border-style:dashed;color:#a3b5cd;background:#0b1220;}
 .eva-nodo[data-estado=completado]{border-color:var(--verde);}
@@ -48,6 +48,27 @@ h1,h2,h3,.font-display{font-family:var(--fuente-display),system-ui,sans-serif;le
 .eva-regimenes{display:grid;gap:8px;}.eva-regimenes button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
 html[data-movimiento=no] *,html[data-movimiento=no] *::before,html[data-movimiento=no] *::after{animation:none!important;transition:none!important;}
 @media(max-width:540px){.shell-hud{gap:6px}.eva-ayuda{padding-right:4px}.eva-ayuda>span{display:none}.hud-stats{gap:3px}.eva-home .portada-contenido{gap:10px}.eva-home .eva-footer{gap:12px}.mapa-ficha{padding:10px}.mapa-ficha .barra-accion .btn{width:100%}.mapa-ficha>p:first-of-type{display:none}.eva-nodo{width:58px;min-height:54px}.eva-guia-cabecera img{width:72px;height:72px}}
-@media(max-height:700px){.eva-home .portada-contenido{gap:7px;padding:16px}.eva-home .eva-footer{display:none}.eva-home .eva-marca svg{width:110px}.eva-home h1{font-size:30px}}
+@media(max-height:700px){.eva-home .portada-contenido{gap:7px;padding:16px}.eva-home .eva-footer{display:none}.eva-home .eva-marca .eva-simbolo{height:46px}.eva-home h1{font-size:30px}}
 @media(max-height:580px){.mapa{height:auto;min-height:450px}.eva-orbita{min-height:180px}.shell-main{overflow-y:auto}.eva-rapida{height:auto;min-height:100%}.eva-rapida-cuerpo{overflow:visible}}
 @media(prefers-reduced-motion:no-preference){.eva-nodo{transition:background .18s,border-color .18s,box-shadow .18s}.eva-home .eva-marca{animation:eva-entrada .7s ease-out both}@keyframes eva-entrada{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}}
+
+/* ── EVA ARCADE: el símbolo □X y la vuelta a /links ─────────────────────────
+   El símbolo (SimboloEva) son dos SVG apilados —halo debajo, trazo encima— en
+   una caja con la proporción de la figura: quien lo usa fija el alto. La vuelta
+   (VolverArcade) lleva a /links de la landing de EVA: en la portada, en su
+   propia fila sobre la tarjeta; en el HUD, desde tableta. */
+.eva-simbolo{position:relative;display:inline-block;flex:none;height:64px;line-height:0}
+.eva-simbolo svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.eva-simbolo-halo{opacity:.85}
+.volver-arcade{gap:10px;padding-inline:14px;flex-shrink:0}
+.volver-arcade .eva-simbolo{height:22px}
+.volver-arcade-nombre{font-family:var(--fuente-display),sans-serif;font-size:13px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
+.volver-arcade-cabecera{display:none}
+@media(min-width:768px){.volver-arcade-cabecera{display:inline-flex}}
+/* Portada: una fila para la vuelta y el resto para la tarjeta, que se centra en
+   lo que queda (y, si no cabe, se desplaza por dentro como antes). */
+.eva-home{grid-template-rows:auto minmax(0,1fr);row-gap:10px}
+.eva-home>.volver-arcade{justify-self:start;align-self:start}
+/* En las pantallas más bajas (un teléfono de 568 px) la fila de la vuelta no
+   debe obligar a desplazar la tarjeta: el símbolo y el nombre se achican. */
+@media(max-height:600px){.eva-home{row-gap:6px}.eva-home .eva-marca .eva-simbolo{height:30px}.eva-home .eva-wordmark{font-size:16px}}
