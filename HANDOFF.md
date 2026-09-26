@@ -29,6 +29,7 @@ Expediente 1725 es uno de los juegos de EVA ARCADE, cuya puerta es https://evapr
 - `VolverArcade`: «← □X EVA ARCADE» en la portada, en su propia fila sobre la tarjeta (`.eva-home` pasa a dos filas); «□X EVA ARCADE» en el HUD desde 768 px. En el teléfono el HUD ya va lleno: se sale por la portada.
 - `app/opengraph-image.tsx`: vista previa para redes (EVA ARCADE, EXPEDIENTE 1725, su categoría). Estadística de visitas de Vercel en el layout (`@vercel/analytics`; activarla en el proyecto).
 - Verificado: lint, typecheck, 44 pruebas, build; auditoría de producción en 0 (las 2 moderadas de `npm audit` son de vitest, de desarrollo, y ya estaban). Portada sin solapes y la tarjeta entera sin desplazar de 320×568 a 1440×900; creación de campaña de 5 pasos y mapa probados en navegador.
+- Publicado el 2026-09-26 (`main` = `6afd8cf`) y verificado en la URL pública https://evaarcadefamilia.vercel.app/: vuelta a /links, icono, vista previa (`og:image` en el dominio correcto), estadística respondiendo (Web Analytics activado) y portada sin solapes en siete tamaños.
 
 ## Comandos
 `npm ci`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`. En Windows usar npm.cmd si PowerShell bloquea scripts. Cambios deben pasar antes de push. No confundir push exitoso con despliegue Vercel confirmado; consultar estado y verificar URL pública. Actualizar este documento con hashes, resultados y pendientes antes del cierre.
