@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useGame } from "@/store/useGame";
 import Icono, { type NombreIcono } from "./Icono";
 import GuiaEva from "@/components/eva/GuiaEva";
+import VolverArcade from "@/components/eva/VolverArcade";
 
 export type Volver = { href: string; etiqueta: string } | { onClick: () => void; etiqueta: string };
 
@@ -126,6 +127,8 @@ export default function GameShell({
           <h1 className="hud-nombre">{titulo}</h1>
         </div>
         {acciones}
+        {/* Vuelta a EVA ARCADE: desde tableta; en el teléfono, por la portada. */}
+        <VolverArcade compacto />
         <GuiaEva />
         {stats && <HudStats />}
       </header>

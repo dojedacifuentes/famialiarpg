@@ -1,12 +1,19 @@
-import { useId } from "react";
+import SimboloEva from "./SimboloEva";
+import { ARCADE } from "@/lib/eva-arcade";
 
-/** Geometría de las referencias del propietario: E de tres trazos, V, A abierta. */
+/**
+ * La marca de EVA ARCADE: el símbolo oficial □X de EVA y el nombre del Arcade,
+ * como en su puerta (`/links` de la landing de EVA). Hasta septiembre de 2026 era
+ * un ƎVΛ dibujado a mano con «// ARCADE».
+ *
+ * `compacta`: para el centro del mapa (ahí sólo se ve el símbolo) y la partida
+ * rápida.
+ */
 export default function MarcaEva({ compacta = false }: { compacta?: boolean }) {
-  const id = useId();
-  return <span className={`eva-marca ${compacta ? "eva-marca-compacta" : ""}`}>
-    <svg viewBox="0 0 220 62" role="img" aria-label="EVA" fill="none">
-      <defs><linearGradient id={id}><stop stopColor="#64D8FF"/><stop offset=".55" stopColor="#B5BFFF"/><stop offset="1" stopColor="#D59AFF"/></linearGradient></defs>
-      <path d="M8 10H57 M8 31H57 M8 52H57 M79 10L108 52L137 10 M157 52L184 10L212 52" stroke={`url(#${id})`} strokeWidth="6" strokeLinecap="square" strokeLinejoin="miter"/>
-    </svg><span className="eva-wordmark">{"// ARCADE"}</span>
-  </span>;
+  return (
+    <span className={`eva-marca ${compacta ? "eva-marca-compacta" : ""}`}>
+      <SimboloEva />
+      <span className="eva-wordmark">{ARCADE.nombre}</span>
+    </span>
+  );
 }

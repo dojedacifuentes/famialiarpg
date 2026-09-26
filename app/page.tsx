@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useGame, useMontado } from "@/store/useGame";
 import MarcaEva from "@/components/eva/MarcaEva";
 import GuiaEva from "@/components/eva/GuiaEva";
+import VolverArcade from "@/components/eva/VolverArcade";
 import Hoja from "@/components/ui/Hoja";
 import Icono from "@/components/ui/Icono";
 
@@ -27,6 +28,8 @@ export default function Home() {
     <main className="portada eva-home">
       <div className="portada-fondo" aria-hidden>
       </div>
+      {/* Vuelta a EVA ARCADE: por aquí se llegó desde /links. */}
+      <VolverArcade />
       <motion.div className="portada-contenido" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
         <MarcaEva />
         <div className="eva-kicker">Un universo de decisiones</div>
